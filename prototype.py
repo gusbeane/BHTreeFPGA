@@ -358,20 +358,3 @@ class DirectGravity:
         Nint_total = len(pos_eval_list) * len(self.point_cloud.mass)
         
         return acc_list, Nint_total
-
-if __name__ == "__main__":
-    data = np.load('nbody_golden.npz')
-    pos = data['pos']
-    pos_float = data['pos_float']
-    pos_eval = data['pos_eval']
-    pos_eval_float = data['pos_eval_float']
-    acc_eval = data['acc_eval']
-    M = np.full(pos.shape[0], data['M'])
-    G = data['G']
-    eps = data['eps']
-
-    # Create PointCloud object (this handles sorting automatically)
-    point_cloud = PointCloud(pos, M, eps)
-    
-    # Create BHTree using the PointCloud
-    bh_tree = BHTree(point_cloud)
