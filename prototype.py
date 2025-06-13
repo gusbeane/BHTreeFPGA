@@ -338,62 +338,41 @@ class BHTree:
         Nint_leaf = 0
         Nint_node = 0
         
-        
-        
+        parent_idxs = [-1] * self.depth
 
+        work_queue = []
+        # add top level nodes to work queue
+        for i in range(8):
+            work_queue.append(i)
 
-    # def walk_tree(self, pos_eval, G, theta=0.5):
-    #     """
-    #     Walk the tree to compute acceleration at pos_eval using Barnes-Hut algorithm
-        
-    #     Args:
-    #         pos_eval: position where to evaluate acceleration
-    #         G: gravitational constant
-    #         theta: opening criterion parameter
-            
-    #     Returns:
-    #         acc: computed acceleration
-    #         Nint_leaf: number of leaf interactions
-    #         Nint_node: number of node interactions
-    #     """
-    #     Nint_leaf = 0
-    #     Nint_node = 0
-    #     acc = np.zeros(3)
-    #     pos0 = pos_eval
-        
-    #     # we start by opening all the top level nodes
-    #     current_level = 1
-    #     for tr in self.tree:
-    #         # we are ignoring all nodes that are finer (higher) than the current level
-    #         if tr.level > current_level:
-    #             continue
+        while len(work_queue) > 0:
+            current_node_idx = work_queue.pop(-1)
+            current_node = self.tree[current_node_idx]
+            parent_idxs[current_node.level] = current_node_idx
 
-    #         # if tr.level is smaller than current_level, it means that we've exhausted all the nodes at current level
-    #         # and we are moving on to the next auncle/grand-auncle/... node
-    #         current_level = tr.level
+            # now we must decide whether to open the node or not
 
-    #         # okay, so if we are at a leaf, we loop through all particles and add to our acc
-    #         if tr.is_leaf:
-    #             for i in range(tr.Npart):
-    #                 rsq = np.sum((self.point_cloud.pos_float[tr.start_idx+i] - pos0)**2)
-    #                 rcubed = rsq**(3./2.)
-    #                 acc += G * self.point_cloud.mass[tr.start_idx+i] * (self.point_cloud.pos_float[tr.start_idx+i] - pos0) / rcubed
-    #                 Nint_leaf += 1
-    #             continue
-            
-    #         # otherwise, we are at a node, so we need to decide whether or not to open it
-    #         # using geometric opening criterion
-    #         Lnode = 1./(2**tr.level)
-    #         d = np.linalg.norm(tr.com - pos0)
-    #         # print(d, Lnode, theta)
-    #         if d < Lnode/theta:
-    #             current_level += 1
-    #         else:
-    #             # we are not opening this node, just use its com to compute acc
-    #             acc += G * tr.mass * (tr.com - pos0) / (np.linalg.norm(tr.com - pos0)**3)
-    #             Nint_node += 1
+            if current_node.is_leaf:
+                for i in range(current_node.Npart):
+                    rsq = np.sum((self.point_cloud.pos_float[current_node.start_idx+i] - pos_eval)**2)
+                    rcubed = rsq**(3./2.)
+                    acc += G * self.point_cloud.mass[current_node.start_idx+i] * (self.point_cloud.pos_float[current_node.start_idx+i] - pos_eval) / rcubed
+                    Nint_leaf += 1
+                continue
+
+            Lnode = 1./(2**current_node.level)
+            d = np.linalg.norm(current_node.com - pos_eval)
+
+            if d > Lnode/theta:
+                # we are not opening this node, just use its com to compute acc
+                acc += G * current_node.mass * (current_node.com - pos_eval) / (np.linalg.norm(current_node.com - pos_eval)**3)
+                Nint_node += 1
+            else:
+                # we are opening this node, so we need to add its children to the work queue
+                for i in range(current_node.Nchild):
+                    work_queue.append(current_node.child_idx + i)
         
-    #     return acc, Nint_leaf, Nint_node
+        return acc, Nint_leaf, Nint_node
 
 class DirectGravity:
     def __init__(self, point_cloud):
@@ -477,3 +456,4 @@ if __name__ == '__main__':
 
     pcloud = PointCloud(pos, M, eps)
     bhtree = BHTree(pcloud)
+    dgrav = DirectGravity(pcloud)
