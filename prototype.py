@@ -124,6 +124,7 @@ class PointCloud:
         
         # Sort all attributes by the PH keys
         sorted_indices = np.argsort(self.keys)
+        # sorted_indices = sorted_indices[::-1]
         
         # Apply sorting to all attributes
         self.pos = pos[sorted_indices]
@@ -145,23 +146,21 @@ class NodeOrLeaf:
         self.Npart = 0
         self.Nleaf = Nleaf
         self.is_leaf = False
+        self.child_idx = -1
+        self.Nchild = 0
 
-    def add_particle(self, pos_float, mass):
+    def add_particle(self, pos_float, mass, N=1):
         self.com += pos_float * mass
         self.mass += mass
-        self.Npart += 1
+        self.Npart += N
 
     def close(self, force_leaf=False):
-        if self.Npart <= self.Nleaf or force_leaf:
-            self.com /= self.mass
-            self.is_leaf = True
+        self.com /= self.mass
+        self.is_leaf = self.Npart <= self.Nleaf or force_leaf
 
-        else:   
-            self.com /= self.mass
-            self.is_leaf = False
-    
     def __repr__(self):
-        return f"Node(level={self.level}, key={self.key}, start_idx={self.start_idx}, Npart={self.Npart}, Nleaf={self.Nleaf}, is_leaf={self.is_leaf})"
+        return f"Node(level={self.level}, key={self.key}, start_idx={self.start_idx}, Npart={self.Npart}, Nleaf={self.Nleaf},\
+ is_leaf={self.is_leaf}, child_idx={self.child_idx}, Nchild={self.Nchild})"
 
 class BHTree:
     def __init__(self, point_cloud, depth=MAX_DEPTH):
@@ -172,74 +171,152 @@ class BHTree:
         # Generate the tree using the point cloud data
         self.tree = self._generate_tree(point_cloud.pos_float, point_cloud.keys, point_cloud.mass, depth)
     
-    def _generate_tree(self, pos_float, keys, mass, depth=MAX_DEPTH):
+    def _generate_tree(self, pos_float, keys, mass, depth=MAX_DEPTH, Nleaf=1):
+        
+        # --- Part 1 ---
+        # create bottom level leaves. assumes keys are at the correct depth
+        incoming_stream = []
+        current_node = NodeOrLeaf(depth, keys[0], 0, Nleaf=Nleaf)
+        current_node.add_particle(pos_float[0], mass[0])
+        for i in range(1, len(keys)):
+            if keys[i] == current_node.key:
+                current_node.add_particle(pos_float[i], mass[i])
+            else:
+                # close current node and add to stream
+                current_node.close(force_leaf=True)
+                incoming_stream.append(current_node)
+                
+                # create new node
+                current_node = NodeOrLeaf(depth, keys[i], i, Nleaf=Nleaf)
+                current_node.add_particle(pos_float[i], mass[i])
+        
+        # close last node
+        current_node.close(force_leaf=True)
+        incoming_stream.append(current_node)
+
+        # --- Part 2 ---
+        # create tree bottom up, streaming nodes and tendrils to be merge sorted by the next kernel
         tree = []
-        node_temp = []
+        itree = 0
+        for current_level in range(depth-1, -1, -1):
+            print('processing level:', current_level, " incoming_stream len:", len(incoming_stream))
+            print('incoming_stream:', incoming_stream[0])
+            tendril_stream = []
+            nodeleaf_stream = []
 
-        # dummy for root node
-        node_temp.append(None)
+            current_children = []
+            Nchild = 0
 
-        # create empty nodes for first particle
-        for j in range(1, depth+1):
-            node_key = keys[0] >> 3*(depth - j)
-            node = NodeOrLeaf(j, node_key, 0)
-            node.add_particle(pos_float[0], mass[0])
-            node_temp.append(node)
+            # start with next node
+            incoming_node = incoming_stream[0]
+            current_key = incoming_node.key >> 3
+            current_node = NodeOrLeaf(current_level, current_key, incoming_node.start_idx)
+            current_node.add_particle(incoming_node.com*incoming_node.mass, incoming_node.mass, incoming_node.Npart)
 
-        # create tree by looping through all particles
-        for i, (posf, key) in enumerate(zip(pos_float, keys)):
-            if i==0:
+            current_children.append(incoming_node)
+            Nchild += 1
+
+            # now process incoming stream
+            for i in range(1, len(incoming_stream)):
+                incoming_node = incoming_stream[i]
+                current_key = incoming_node.key >> 3
+                if current_key == current_node.key:
+                    # we add the node to the parent node
+                    current_node.add_particle(incoming_node.com * incoming_node.mass, incoming_node.mass, incoming_node.Npart)
+                    current_children.append(incoming_node)
+                    Nchild += 1
+                else:
+                    # emit children to final tree if they are not only children
+                    # otherwise, promote child and place into tendril stream
+                    if Nchild > 1:
+                        current_node.child_idx = itree
+                        current_node.Nchild = Nchild
+                        for j in range(Nchild):
+                            tree.append(current_children[j])
+                            itree += 1
+                        
+                        # emit the node to the nodeleaf stream
+                        current_node.close()
+                        nodeleaf_stream.append(current_node)
+                    else:
+                        current_children[0].level -= 1
+                        current_children[0].key >>= 3
+                        tendril_stream.append(current_children[0])
+
+                    
+
+                    current_node = NodeOrLeaf(current_level, current_key, incoming_node.start_idx)
+                    current_node.add_particle(incoming_node.com*incoming_node.mass, incoming_node.mass, incoming_node.Npart)
+
+                    # reset children
+                    current_children = [incoming_node]
+                    Nchild = 1
+
+            # now we close out the last node
+            if Nchild > 1:
+                current_node.child_idx = itree
+                current_node.Nchild = Nchild
+                for j in range(Nchild):
+                    tree.append(current_children[j])
+                    itree += 1
+
+                # emit the node to the nodeleaf stream
+                current_node.close()
+                nodeleaf_stream.append(current_node)
+                
+            else:
+                current_children[0].level -= 1
+                current_children[0].key >>= 3
+                tendril_stream.append(current_children[0])
+
+            # now we need to merge the nodeleaf 
+            incoming_stream = []
+        
+            if len(nodeleaf_stream) == 0:
+                incoming_stream = tendril_stream
                 continue
 
-            for j in range(1, depth+1):
-                node_key = key >> 3*(depth - j)
+            if len(tendril_stream) == 0:
+                incoming_stream = nodeleaf_stream
+                continue
 
-                if node_key == node_temp[j].key:
-                    node_temp[j].add_particle(posf, mass[i])
+            i,j = 0,0
+            while True:
+                current_nodeleaf = nodeleaf_stream[i]
+                current_tendril = tendril_stream[j]
+                
+                if current_nodeleaf.key < current_tendril.key:
+                    incoming_stream.append(current_nodeleaf)
+                    i += 1
+                    if i == len(nodeleaf_stream):
+                        while j < len(tendril_stream):
+                            incoming_stream.append(tendril_stream[j])
+                            j += 1
+                        break
 
+                elif current_nodeleaf.key > current_tendril.key:
+                    incoming_stream.append(current_tendril)
+                    j += 1
+                    if j == len(tendril_stream):
+                        while i < len(nodeleaf_stream):
+                            incoming_stream.append(nodeleaf_stream[i])
+                            i += 1
+                        break
                 else:
-                    # we need to close all the nodes below this level
-                    for k in range(j, depth+1):
-                        force_leaf = k == depth
-                        node_temp[k].close(force_leaf)
-
-                        if node_temp[k].is_leaf:
-                            k_leaf = k
-                            # print(i, 'k_leaf', k_leaf)
-                            break
-                    
-                    # now we add all of these nodes in reverse order and create new nodes
-                    for k in range(depth, j-1, -1):
-
-                        if k <= k_leaf:
-                            tree.append(copy.deepcopy(node_temp[k]))
-
-                        key_for_level_k = keys[i] >> (3*(depth - k))
-
-                        node_temp[k] = NodeOrLeaf(k, key_for_level_k, i)
-                        node_temp[k].add_particle(posf, mass[i])
-
-                    # now we can go to the next particle
-                    break
+                    print(current_nodeleaf)
+                    print(current_tendril)
+                    raise ValueError("This should not occur!")
         
+        # end
+        # We don't add this because it is the root node, which we will always open
+        # print('incoming_stream=', incoming_stream)
+        # for node in incoming_stream:
+            # node.child_idx = itree
+            # tree.append(node)
 
-        # now finalize the tree
-        # loop through all nodes and close them, stopping at the first leaf node
-        for k in range(1, depth+1):
-            force_leaf = k == depth-1
-            node_temp[k].close(force_leaf)
-
-            if node_temp[k].is_leaf:
-                k_leaf = k
-                break
-
-        # now we add all of these nodes in reverse order and create new nodes
-        for k in range(depth, 0, -1):
-            if k <= k_leaf:
-                tree.append(copy.deepcopy(node_temp[k]))
-
-        # finally reverse the list
         tree.reverse()
+        for node in tree:
+            node.child_idx = len(tree) - node.child_idx - node.Nchild
 
         return tree
     
@@ -257,44 +334,67 @@ class BHTree:
             Nint_leaf: number of leaf interactions
             Nint_node: number of node interactions
         """
+
+        acc = np.zeros(3)
         Nint_leaf = 0
         Nint_node = 0
-        acc = np.zeros(3)
-        pos0 = pos_eval
         
-        # we start by opening all the top level nodes
-        current_level = 1
-        for tr in self.tree:
-            # we are ignoring all nodes that are finer (higher) than the current level
-            if tr.level > current_level:
-                continue
+        
+        
 
-            # if tr.level is smaller than current_level, it means that we've exhausted all the nodes at current level
-            # and we are moving on to the next auncle/grand-auncle/... node
-            current_level = tr.level
 
-            # okay, so if we are at a leaf, we loop through all particles and add to our acc
-            if tr.is_leaf:
-                for i in range(tr.Npart):
-                    rsq = np.sum((self.point_cloud.pos_float[tr.start_idx+i] - pos0)**2)
-                    rcubed = rsq**(3./2.)
-                    acc += G * self.point_cloud.mass[tr.start_idx+i] * (self.point_cloud.pos_float[tr.start_idx+i] - pos0) / rcubed
-                    Nint_leaf += 1
-                continue
+    # def walk_tree(self, pos_eval, G, theta=0.5):
+    #     """
+    #     Walk the tree to compute acceleration at pos_eval using Barnes-Hut algorithm
+        
+    #     Args:
+    #         pos_eval: position where to evaluate acceleration
+    #         G: gravitational constant
+    #         theta: opening criterion parameter
             
-            # otherwise, we are at a node, so we need to decide whether or not to open it
-            # using geometric opening criterion
-            Lnode = 1./(2**tr.level)
-            d = np.linalg.norm(tr.com - pos0)
-            # print(d, Lnode, theta)
-            if d < Lnode/theta:
-                current_level += 1
-            else:
-                # we are not opening this node, just use its com to compute acc
-                acc += G * tr.mass * (tr.com - pos0) / (np.linalg.norm(tr.com - pos0)**3)
-                Nint_node += 1
+    #     Returns:
+    #         acc: computed acceleration
+    #         Nint_leaf: number of leaf interactions
+    #         Nint_node: number of node interactions
+    #     """
+    #     Nint_leaf = 0
+    #     Nint_node = 0
+    #     acc = np.zeros(3)
+    #     pos0 = pos_eval
         
-        return acc, Nint_leaf, Nint_node
+    #     # we start by opening all the top level nodes
+    #     current_level = 1
+    #     for tr in self.tree:
+    #         # we are ignoring all nodes that are finer (higher) than the current level
+    #         if tr.level > current_level:
+    #             continue
+
+    #         # if tr.level is smaller than current_level, it means that we've exhausted all the nodes at current level
+    #         # and we are moving on to the next auncle/grand-auncle/... node
+    #         current_level = tr.level
+
+    #         # okay, so if we are at a leaf, we loop through all particles and add to our acc
+    #         if tr.is_leaf:
+    #             for i in range(tr.Npart):
+    #                 rsq = np.sum((self.point_cloud.pos_float[tr.start_idx+i] - pos0)**2)
+    #                 rcubed = rsq**(3./2.)
+    #                 acc += G * self.point_cloud.mass[tr.start_idx+i] * (self.point_cloud.pos_float[tr.start_idx+i] - pos0) / rcubed
+    #                 Nint_leaf += 1
+    #             continue
+            
+    #         # otherwise, we are at a node, so we need to decide whether or not to open it
+    #         # using geometric opening criterion
+    #         Lnode = 1./(2**tr.level)
+    #         d = np.linalg.norm(tr.com - pos0)
+    #         # print(d, Lnode, theta)
+    #         if d < Lnode/theta:
+    #             current_level += 1
+    #         else:
+    #             # we are not opening this node, just use its com to compute acc
+    #             acc += G * tr.mass * (tr.com - pos0) / (np.linalg.norm(tr.com - pos0)**3)
+    #             Nint_node += 1
+        
+    #     return acc, Nint_leaf, Nint_node
 
 class DirectGravity:
     def __init__(self, point_cloud):
@@ -358,3 +458,23 @@ class DirectGravity:
         Nint_total = len(pos_eval_list) * len(self.point_cloud.mass)
         
         return acc_list, Nint_total
+    
+if __name__ == '__main__':
+    np.random.seed(9996)
+
+    Npart = 10000
+
+    # Maximum value for 32-bit unsigned integer
+    MAX_INT32 = np.iinfo(np.uint32).max
+
+    # Generate random 3D positions for particle field
+    pos = np.random.randint(0, MAX_INT32, size=(Npart, 3), dtype=np.uint32)
+    pos_float = ((pos.astype(np.float64)) / MAX_INT32).astype(np.float32)
+    M = np.full(Npart, 1. / Npart)
+    G = 1.
+
+    # Softening length equal to interparticle spacing
+    eps = np.full(Npart, np.sqrt(3.) / Npart)
+
+    pcloud = PointCloud(pos, M, eps)
+    bhtree = BHTree(pcloud)
