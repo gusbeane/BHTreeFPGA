@@ -134,7 +134,7 @@ class PointCloud:
         self.eps = eps[sorted_indices] if hasattr(eps, '__len__') else eps
 
 class NodeOrLeaf:
-    def __init__(self, level, key, start_idx, Nleaf=1):
+    def __init__(self, level, key, start_idx, Nleaf=1, force_leaf=False):
         if Nleaf != 1:
             raise ValueError('Nleaf must be 1')
 
@@ -148,15 +148,16 @@ class NodeOrLeaf:
         self.is_leaf = False
         self.child_idx = -1
         self.Nchild = 0
+        self.force_leaf = force_leaf
 
     def add_particle(self, pos_float, mass, N=1):
         self.com += pos_float * mass
         self.mass += mass
         self.Npart += N
 
-    def close(self, force_leaf=False):
+    def close(self):
         self.com /= self.mass
-        self.is_leaf = self.Npart <= self.Nleaf or force_leaf
+        self.is_leaf = self.Npart <= self.Nleaf or self.force_leaf
 
     def __repr__(self):
         return f"Node(level={self.level}, key={self.key}, start_idx={self.start_idx}, Npart={self.Npart}, Nleaf={self.Nleaf},\
@@ -176,22 +177,20 @@ class BHTree:
         # --- Part 1 ---
         # create bottom level leaves. assumes keys are at the correct depth
         incoming_stream = []
-        current_node = NodeOrLeaf(depth, keys[0], 0, Nleaf=Nleaf)
+        current_node = NodeOrLeaf(depth, keys[0], 0, Nleaf=Nleaf, force_leaf=True)
         current_node.add_particle(pos_float[0], mass[0])
         for i in range(1, len(keys)):
             if keys[i] == current_node.key:
                 current_node.add_particle(pos_float[i], mass[i])
             else:
                 # close current node and add to stream
-                current_node.close(force_leaf=True)
                 incoming_stream.append(current_node)
                 
                 # create new node
-                current_node = NodeOrLeaf(depth, keys[i], i, Nleaf=Nleaf)
+                current_node = NodeOrLeaf(depth, keys[i], i, Nleaf=Nleaf, force_leaf=True)
                 current_node.add_particle(pos_float[i], mass[i])
         
         # close last node
-        current_node.close(force_leaf=True)
         incoming_stream.append(current_node)
 
         # --- Part 2 ---
@@ -211,7 +210,7 @@ class BHTree:
             incoming_node = incoming_stream[0]
             current_key = incoming_node.key >> 3
             current_node = NodeOrLeaf(current_level, current_key, incoming_node.start_idx)
-            current_node.add_particle(incoming_node.com*incoming_node.mass, incoming_node.mass, incoming_node.Npart)
+            current_node.add_particle(incoming_node.com/incoming_node.mass, incoming_node.mass, incoming_node.Npart)
 
             current_children.append(incoming_node)
             Nchild += 1
@@ -222,7 +221,7 @@ class BHTree:
                 current_key = incoming_node.key >> 3
                 if current_key == current_node.key:
                     # we add the node to the parent node
-                    current_node.add_particle(incoming_node.com * incoming_node.mass, incoming_node.mass, incoming_node.Npart)
+                    current_node.add_particle(incoming_node.com/incoming_node.mass, incoming_node.mass, incoming_node.Npart)
                     current_children.append(incoming_node)
                     Nchild += 1
                 else:
@@ -232,11 +231,11 @@ class BHTree:
                         current_node.child_idx = itree
                         current_node.Nchild = Nchild
                         for j in range(Nchild):
+                            current_children[j].close()
                             tree.append(current_children[j])
                             itree += 1
                         
                         # emit the node to the nodeleaf stream
-                        current_node.close()
                         nodeleaf_stream.append(current_node)
                     else:
                         current_children[0].level -= 1
@@ -246,7 +245,7 @@ class BHTree:
                     
 
                     current_node = NodeOrLeaf(current_level, current_key, incoming_node.start_idx)
-                    current_node.add_particle(incoming_node.com*incoming_node.mass, incoming_node.mass, incoming_node.Npart)
+                    current_node.add_particle(incoming_node.com/incoming_node.mass, incoming_node.mass, incoming_node.Npart)
 
                     # reset children
                     current_children = [incoming_node]
@@ -257,11 +256,11 @@ class BHTree:
                 current_node.child_idx = itree
                 current_node.Nchild = Nchild
                 for j in range(Nchild):
+                    current_children[j].close()
                     tree.append(current_children[j])
                     itree += 1
 
                 # emit the node to the nodeleaf stream
-                current_node.close()
                 nodeleaf_stream.append(current_node)
                 
             else:
