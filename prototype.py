@@ -165,9 +165,6 @@ class BHTree:
         tree = []
         node_temp = []
 
-        # dummy for root node
-        node_temp.append(None)
-
         # create empty nodes for first particle
         for j in range(1, depth+1):
             node_key = keys[0] >> 3*(depth - j)
@@ -183,16 +180,16 @@ class BHTree:
             for j in range(1, depth+1):
                 node_key = key >> 3*(depth - j)
 
-                if node_key == node_temp[j].key:
-                    node_temp[j].add_particle(posf, mass[i])
+                if node_key == node_temp[j-1].key:
+                    node_temp[j-1].add_particle(posf, mass[i])
 
                 else:
                     # we need to close all the nodes below this level
                     for k in range(j, depth+1):
                         force_leaf = k == depth
-                        node_temp[k].close(force_leaf)
+                        node_temp[k-1].close(force_leaf)
 
-                        if node_temp[k].is_leaf:
+                        if node_temp[k-1].is_leaf:
                             k_leaf = k
                             # print(i, 'k_leaf', k_leaf)
                             break
@@ -201,12 +198,12 @@ class BHTree:
                     for k in range(depth, j-1, -1):
 
                         if k <= k_leaf:
-                            tree.append(copy.deepcopy(node_temp[k]))
+                            tree.append(copy.deepcopy(node_temp[k-1]))
 
                         key_for_level_k = keys[i] >> (3*(depth - k))
 
-                        node_temp[k] = NodeOrLeaf(k, key_for_level_k, i)
-                        node_temp[k].add_particle(posf, mass[i])
+                        node_temp[k-1] = NodeOrLeaf(k, key_for_level_k, i)
+                        node_temp[k-1].add_particle(posf, mass[i])
 
                     # now we can go to the next particle
                     break
@@ -216,16 +213,16 @@ class BHTree:
         # loop through all nodes and close them, stopping at the first leaf node
         for k in range(1, depth+1):
             force_leaf = k == depth-1
-            node_temp[k].close(force_leaf)
+            node_temp[k-1].close(force_leaf)
 
-            if node_temp[k].is_leaf:
+            if node_temp[k-1].is_leaf:
                 k_leaf = k
                 break
 
         # now we add all of these nodes in reverse order and create new nodes
         for k in range(depth, 0, -1):
             if k <= k_leaf:
-                tree.append(copy.deepcopy(node_temp[k]))
+                tree.append(copy.deepcopy(node_temp[k-1]))
 
         # finally reverse the list
         tree.reverse()

@@ -104,4 +104,4 @@ for idx, theta in enumerate(theta_values):
     # Assert that the maximum relative error is within expected bounds
     assert max_relative_error < max_rel_err[idx], f"Maximum relative error {max_relative_error:.2e} exceeds threshold {max_rel_err[idx]:.2e} for θ={theta}"
 
-print("\n=== TEST COMPLETE ===") 
+print("\n=== TEST COMPLETE ===")
