@@ -98,17 +98,6 @@ class PeanoHilbert:
         keys = np.array([self.generate_key(pos, depth) for pos in pos_list])
         return keys
 
-# Legacy functions for backward compatibility
-def generate_ph_key(pos, depth=MAX_DEPTH):
-    """Legacy function - use PeanoHilbert class instead"""
-    ph = PeanoHilbert(dimensions=3, max_depth=depth)
-    return ph.generate_key(pos, depth)
-
-def generate_ph_key_from_list(pos_list, depth=MAX_DEPTH):
-    """Legacy function - use PeanoHilbert class instead"""
-    ph = PeanoHilbert(dimensions=3, max_depth=depth)
-    return ph.generate_keys(pos_list, depth)
-
 class PointCloud:
     def __init__(self, pos, mass, eps, depth=MAX_DEPTH):
         # Store original integer positions
