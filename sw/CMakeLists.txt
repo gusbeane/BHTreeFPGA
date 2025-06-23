@@ -8,10 +8,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Include directories
 include_directories(include)
 
-# Add executable
+# Add main executable
 add_executable(bhtree
     src/peano_hilbert.cpp
     src/bhtree.cpp
+)
+
+# Add test executable
+add_executable(test_peano_hilbert
+    src/peano_hilbert.cpp
+    tests/test_peano_hilbert.cpp
 )
 
 # Optional: Add compiler warnings
