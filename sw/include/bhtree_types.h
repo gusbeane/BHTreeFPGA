@@ -1,0 +1,30 @@
+#pragma once
+
+#include <array>
+#include <vector>
+#include <cstdint>
+
+// Type definitions for BHTree
+typedef std::array<uint32_t, 3> Position3D;
+typedef std::vector<Position3D> PositionVector;
+
+// Node/Leaf structure for BHTree
+struct NodeOrLeaf {
+    // node information. in principle level and key can be in the same data type, but we keep them separate for now
+    unsigned char level;
+    unsigned int key; // uses 3 * MAX_DEPTH bits
+
+    // particle information
+    unsigned int start_idx; // start index in the particle array
+    unsigned int Nparticles; // number of particles in the node
+    
+    // center of mass
+    double com_x;
+    double com_y;
+    double com_z;
+    double mass;
+
+    // whether or not the node is a leaf.
+    // if the node is a leaf, then we simply read off the particle data from start_idx to start_idx + Nparticles
+    bool is_leaf;
+}; 
