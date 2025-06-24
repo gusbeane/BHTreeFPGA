@@ -11,6 +11,7 @@ private:
     PositionVector positions;           // Integer positions
     std::vector<RealPosition3D> real_positions;  // Real (floating-point) positions
     std::vector<uint32_t> ph_keys;
+    std::vector<double> masses;
     PeanoHilbert ph;
     double box_size;                    // Box size for coordinate conversion
     
@@ -23,6 +24,7 @@ public:
     PointCloud() : box_size(1.0) {}
     PointCloud(size_t num_points);      // Uses default box_size = 1.0
     PointCloud(size_t num_points, double box_size);
+    PointCloud(size_t num_points, double box_size, const std::vector<double>& masses);
     
     // Position management
     void add_position(const Position3D& pos);
@@ -39,6 +41,7 @@ public:
     // Data access - integer positions
     const std::vector<uint32_t>& get_ph_keys() const;
     const PositionVector& get_positions() const;
+    const std::vector<double>& get_masses() const;
     std::pair<std::vector<uint32_t>, PositionVector> get_sorted_data() const;
     
     // Data access - real positions  
@@ -52,7 +55,6 @@ public:
     
     // Static factory methods
     static PointCloud random(size_t num_points);                    // Uses box_size = 1.0
-    static PointCloud random(size_t num_points, double box_size);
 };
 
 #endif // POINTCLOUD_H 

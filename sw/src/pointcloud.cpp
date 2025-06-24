@@ -15,6 +15,12 @@ PointCloud::PointCloud(size_t num_points, double box_size) : box_size(box_size) 
     update_real_positions();
 }
 
+// Constructor for random point cloud with specified box_size and masses
+PointCloud::PointCloud(size_t num_points, double box_size, const std::vector<double>& masses) : box_size(box_size), masses(masses) {
+    generate_random_positions(num_points);
+    update_real_positions();
+}
+
 // Add a single position
 void PointCloud::add_position(const Position3D& pos) {
     positions.push_back(pos);
@@ -119,6 +125,11 @@ const std::vector<RealPosition3D>& PointCloud::get_real_positions() const {
     return real_positions;
 }
 
+// Get the masses
+const std::vector<double>& PointCloud::get_masses() const {
+    return masses;
+}
+
 // Get both sorted keys and integer positions
 std::pair<std::vector<uint32_t>, PositionVector> PointCloud::get_sorted_data() const {
     return std::make_pair(ph_keys, positions);
@@ -148,12 +159,9 @@ bool PointCloud::empty() const {
 
 // Static factory method for creating random point clouds (box_size = 1.0)
 PointCloud PointCloud::random(size_t num_points) {
-    return PointCloud(num_points, 1.0);
-}
-
-// Static factory method for creating random point clouds with specified box_size
-PointCloud PointCloud::random(size_t num_points, double box_size) {
-    return PointCloud(num_points, box_size);
+    double mass = 1.0 / static_cast<double>(num_points);
+    std::vector<double> masses(num_points, mass);
+    return PointCloud(num_points, 1.0, masses);
 }
 
 // Generate random positions (0 to UINT32_MAX for each coordinate)

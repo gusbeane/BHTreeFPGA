@@ -133,6 +133,7 @@ Tree build_tree(PointCloud pc) {
 
     // Get the real positions (not integer ones)
     std::vector<RealPosition3D> pos = pc.get_real_positions();
+    std::vector<double> mass = pc.get_masses();
 
     // We start with an array of temporary nodes with size of the max depth
     // We don't make the root node
@@ -141,12 +142,12 @@ Tree build_tree(PointCloud pc) {
     for (int i = 1; i < MAX_DEPTH+1; i++) {
         temp_nodes[i-1].level = i;
         temp_nodes[i-1].key = key0 >> (3 * (MAX_DEPTH - i));
-        add_particle_to_node(temp_nodes[i-1], pos[0], 1.0);
+        add_particle_to_node(temp_nodes[i-1], pos[0], mass[0]);
     }
 
     // Now we loop through all the particles and add them to the tree
     for (int i = 1; i < pc.size(); i++) {
-        std::vector<NodeOrLeaf> new_nodes = add_particle_to_tree(temp_nodes, pos[i], 1.0, pc.get_ph_keys()[i], i);
+        std::vector<NodeOrLeaf> new_nodes = add_particle_to_tree(temp_nodes, pos[i], mass[i], pc.get_ph_keys()[i], i);
         tree.insert(tree.end(), new_nodes.begin(), new_nodes.end());
     }
 
