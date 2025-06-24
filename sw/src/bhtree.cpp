@@ -1,9 +1,63 @@
 #include <iostream>
-#include "../include/peano_hilbert.h"
 #include "../include/bhtree_types.h"
 #include "../include/bhtree_config.h"
-#include <random>
 #include "../include/pointcloud.h"
+#include <algorithm>
+#include <string>
+#include <sstream>
+
+std::string format_ph_key(uint32_t key, int level) {
+    std::ostringstream oss;
+    
+    // Extract 3 bits per level, starting from the most significant bits
+    for (int i = level - 1; i >= 0; i--) {
+        if (i < level - 1) {
+            oss << " ";  // Add space between levels
+        }
+        
+        // Extract 3 bits for this level
+        uint32_t level_bits = (key >> (3 * i)) & 0x7;  // 0x7 = 0b111
+        
+        // Convert to 3-bit binary string
+        oss << ((level_bits & 4) ? '1' : '0')
+            << ((level_bits & 2) ? '1' : '0') 
+            << ((level_bits & 1) ? '1' : '0');
+    }
+    
+    return oss.str();
+}
+
+std::string format_ph_key_padded(uint32_t key, int level, int pad_to_level = 5) {
+    std::ostringstream oss;
+    
+    // Add the actual key bits first
+    for (int i = level - 1; i >= 0; i--) {
+        if (i < level - 1) {
+            oss << " ";  // Add space between levels
+        }
+        
+        // Extract 3 bits for this level
+        uint32_t level_bits = (key >> (3 * i)) & 0x7;  // 0x7 = 0b111
+        
+        // Convert to 3-bit binary string
+        oss << ((level_bits & 4) ? '1' : '0')
+            << ((level_bits & 2) ? '1' : '0') 
+            << ((level_bits & 1) ? '1' : '0');
+    }
+    
+    // Add trailing padding spaces
+    for (int i = level; i < pad_to_level; i++) {
+        oss << "    ";  // 4 spaces (3 for digits + 1 for separator)
+    }
+    
+    return oss.str();
+}
+
+void print_node(const NodeOrLeaf& node) {
+    std::cout << "Level: " << node.level 
+              << " Key: " << format_ph_key_padded(node.key, node.level) 
+              << " Npart: " << node.Nparticles << " StartIdx: " << node.start_idx << std::endl;
+}
 
 void add_particle_to_node(NodeOrLeaf& node, RealPosition3D pos, double mass, int index = -1) {
     node.com_x += pos[0] * mass;
@@ -17,7 +71,7 @@ void add_particle_to_node(NodeOrLeaf& node, RealPosition3D pos, double mass, int
     }
 }
 
-std::vector<NodeOrLeaf> add_particle_to_tree(Tree& tree, Tree& temp_nodes, RealPosition3D pos, double mass, int key, int index) {
+std::vector<NodeOrLeaf> add_particle_to_tree(Tree& temp_nodes, RealPosition3D pos, double mass, int key, int index) {
     // we loop through the levels and find the node that has the first discrepancy
     std::vector<NodeOrLeaf> new_nodes;
     new_nodes.reserve(MAX_DEPTH);
@@ -48,6 +102,22 @@ std::vector<NodeOrLeaf> add_particle_to_tree(Tree& tree, Tree& temp_nodes, RealP
         }
     }
 
+    std::reverse(new_nodes.begin(), new_nodes.end());
+
+    return new_nodes;
+}
+
+std::vector<NodeOrLeaf> flush_out_nodes(Tree& temp_nodes) {
+    std::vector<NodeOrLeaf> new_nodes;
+    new_nodes.reserve(MAX_DEPTH);
+    for (int i = 1; i < MAX_DEPTH+1; i++) {
+        new_nodes.push_back(temp_nodes[i-1]);
+
+        if(temp_nodes[i-1].Nparticles <= NLEAF) {
+            break;
+        }
+    }
+    std::reverse(new_nodes.begin(), new_nodes.end());
     return new_nodes;
 }
 
@@ -71,11 +141,16 @@ Tree build_tree(PointCloud pc) {
 
     // Now we loop through all the particles and add them to the tree
     for (int i = 1; i < pc.size(); i++) {
-        std::vector<NodeOrLeaf> new_nodes = add_particle_to_tree(tree, temp_nodes, pos[i], 1.0, pc.get_ph_keys()[i], i);
+        std::vector<NodeOrLeaf> new_nodes = add_particle_to_tree(temp_nodes, pos[i], 1.0, pc.get_ph_keys()[i], i);
         tree.insert(tree.end(), new_nodes.begin(), new_nodes.end());
     }
 
-    
+    // Flush out the remaining nodes
+    std::vector<NodeOrLeaf> new_nodes = flush_out_nodes(temp_nodes);
+    tree.insert(tree.end(), new_nodes.begin(), new_nodes.end());
+
+    // Reverse the order of the tree
+    std::reverse(tree.begin(), tree.end());
 
     return tree;
 }
@@ -83,6 +158,14 @@ Tree build_tree(PointCloud pc) {
 int main(int argc, char* argv[]) {
     PointCloud pc = PointCloud::random(1000);
     pc.sort_by_ph_keys();
+
+    Tree tree = build_tree(pc);
+    
+    // Print first 10 nodes
+    std::cout << "First 10 nodes:" << std::endl;
+    for (int i = 0; i < 10; i++) {
+        print_node(tree[i]);
+    }
     
     return 0;
 } 

@@ -12,7 +12,7 @@ typedef std::array<double, 3> RealPosition3D;
 // Node/Leaf structure for BHTree
 struct NodeOrLeaf {
     // node information. in principle level and key can be in the same data type, but we keep them separate for now
-    unsigned char level;
+    uint16_t level;
     unsigned int key; // uses 3 * MAX_DEPTH bits
 
     // particle information
