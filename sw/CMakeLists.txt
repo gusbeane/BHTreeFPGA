@@ -5,6 +5,9 @@ project(BHTreeFPGA)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Export compile commands for IDE support (generates compile_commands.json)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Set output directories - executables go to the top level (sw directory)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR})
