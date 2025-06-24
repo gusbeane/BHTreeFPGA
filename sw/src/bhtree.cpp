@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <string>
 #include <sstream>
+#include <iomanip>
 
 std::string format_ph_key(uint32_t key, int level) {
     std::ostringstream oss;
@@ -56,7 +57,11 @@ std::string format_ph_key_padded(uint32_t key, int level, int pad_to_level = 5) 
 void print_node(const NodeOrLeaf& node) {
     std::cout << "Level: " << node.level 
               << " Key: " << format_ph_key_padded(node.key, node.level) 
-              << " Npart: " << node.Nparticles << " StartIdx: " << node.start_idx << std::endl;
+              << " Npart: " << std::left << std::setw(3) << node.Nparticles 
+              << " StartIdx: " << node.start_idx
+              << " COM: (" << std::fixed << std::setprecision(3) 
+              << node.com_x << ", " << node.com_y << ", " << node.com_z << ")"
+              << " Mass: " << node.mass << std::endl;
 }
 
 void add_particle_to_node(NodeOrLeaf& node, RealPosition3D pos, double mass, int index = -1) {
@@ -150,7 +155,15 @@ Tree build_tree(PointCloud pc) {
     tree.insert(tree.end(), new_nodes.begin(), new_nodes.end());
 
     // Reverse the order of the tree
-    std::reverse(tree.begin(), tree.end());
+    // Commented out for now for HLS
+    // std::reverse(tree.begin(), tree.end());
+
+    // Divide com by mass
+    for (int i = 0; i < tree.size(); i++) {
+        tree[i].com_x /= tree[i].mass;
+        tree[i].com_y /= tree[i].mass;
+        tree[i].com_z /= tree[i].mass;
+    }
 
     return tree;
 }
@@ -164,7 +177,7 @@ int main(int argc, char* argv[]) {
     // Print first 10 nodes
     std::cout << "First 10 nodes:" << std::endl;
     for (int i = 0; i < 10; i++) {
-        print_node(tree[i]);
+        print_node(tree[tree.size() - i - 1]);
     }
     
     return 0;
