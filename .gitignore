@@ -1,2 +1,10 @@
 __pycache__/
 build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# executables
+bhtree
+test_peano_hilbert
