@@ -20,3 +20,4 @@ compile_commands.json
 .vscode/launch.json
 .vscode/tasks.json
 # Keep .vscode/c_cpp_properties.json - it's project-specific
+hw/.analyzer_session.json
