@@ -2,9 +2,9 @@
 #include "bhtree_config_hls.h"
 
 nodeleaf add_particle_to_node(const nodeleaf& input_node, const particle_t& particle, bool set_idx) {
-    // #pragma HLS INLINE
-    #pragma HLS PIPELINE II=1
-#pragma HLS INTERFACE ap_none port=particle
+    #pragma HLS INLINE
+    // #pragma HLS PIPELINE II=1
+    #pragma HLS INTERFACE ap_none port=particle
     
     nodeleaf output_node = input_node;
     
@@ -22,37 +22,29 @@ nodeleaf add_particle_to_node(const nodeleaf& input_node, const particle_t& part
     return output_node;
 }
 
-struct tree_output {
-    nodeleaf output_nodes[MAX_DEPTH];     // Nodes to write to DRAM tree
-    nodeleaf new_stack[MAX_DEPTH];        // Updated stack for next particle
-    count_t num_output_nodes;             // Number of valid nodes in output_nodes
-};
-
-tree_output add_particle_to_tree(
-    const nodeleaf input_stack[MAX_DEPTH],  // Current node stack
-    const pos_t pos_x, const pos_t pos_y, const pos_t pos_z,  // Particle position
-    const mass_t mass,                      // Particle mass
-    const phkey_t particle_key,             // Particle's Peano-Hilbert key
-    const count_t particle_idx              // Particle index
+nodeleaf_stack add_particle_to_tree(
+    const nodeleaf_stack& input_stack,  // Current node stack
+    const particle_t& particle,
+    hls::stream<nodeleaf_stack>& node_stream
 ) {
-    #pragma HLS INTERFACE ap_none port=input_stack
-    #pragma HLS ARRAY_PARTITION variable=input_stack complete dim=1
+    // #pragma HLS INTERFACE ap_none port=particle
+    // #pragma HLS INTERFACE ap_none port=input_stack
+    #pragma HLS ARRAY_PARTITION variable=input_stack.nodes complete dim=1
     #pragma HLS PIPELINE II=1
     
-    tree_output result;
-    #pragma HLS ARRAY_PARTITION variable=result.output_nodes complete dim=1
-    #pragma HLS ARRAY_PARTITION variable=result.new_stack complete dim=1
+    nodeleaf_stack result;
+    #pragma HLS ARRAY_PARTITION variable=result.nodes complete dim=1
     
     // Initialize output
-    result.num_output_nodes = 0;
+    result.num_nodes = 0;
     
     // Copy input stack to working stack
-    nodeleaf temp_stack[MAX_DEPTH];
+    nodeleaf_stack temp_stack;
     #pragma HLS ARRAY_PARTITION variable=temp_stack complete dim=1
     
     COPY_STACK: for(int i = 0; i < MAX_DEPTH; i++) {
         #pragma HLS UNROLL
-        temp_stack[i] = input_stack[i];
+        temp_stack.nodes[i] = input_stack.nodes[i];
     }
     
     bool flush_mode = false;
@@ -62,12 +54,12 @@ tree_output add_particle_to_tree(
         #pragma HLS UNROLL
         
         // Calculate node key for this level
-        phkey_t node_key = particle_key >> (3 * (MAX_DEPTH - level));
+        phkey_t node_key = particle.key >> (3 * (MAX_DEPTH - level));
         
-        if(node_key == temp_stack[level-1].key && !flush_mode) {
+        if(node_key == temp_stack.nodes[level-1].key && !flush_mode) {
             // Key matches and not in flush mode - just add particle
-            temp_stack[level-1] = add_particle_to_node(
-                temp_stack[level-1], pos_x, pos_y, pos_z, mass, particle_idx
+            temp_stack.nodes[level-1] = add_particle_to_node(
+                temp_stack.nodes[level-1], particle, false
             );
         } else {
             // Key mismatch or in flush mode - need to flush
@@ -75,12 +67,12 @@ tree_output add_particle_to_tree(
             
             if(!quiet_mode) {
                 // Add current node to output
-                result.output_nodes[result.num_output_nodes] = temp_stack[level-1];
-                result.num_output_nodes++;
+                result.nodes[result.num_nodes] = temp_stack.nodes[level-1];
+                result.num_nodes++;
             }
 
             // Check if we should enter quiet mode
-            if(temp_stack[level-1].num_particles <= NLEAF) {
+            if(temp_stack.nodes[level-1].num_particles <= NLEAF) {
                 quiet_mode = true;
             }
             
@@ -97,8 +89,8 @@ tree_output add_particle_to_tree(
             new_node.is_leaf = true;
             
             // Add particle to new node
-            temp_stack[level-1] = add_particle_to_node(
-                new_node, pos_x, pos_y, pos_z, mass, particle_idx
+            temp_stack.nodes[level-1] = add_particle_to_node(
+                new_node, particle, true
             );
         }
     }
@@ -106,8 +98,11 @@ tree_output add_particle_to_tree(
     // Copy working stack to output stack
     COPY_OUTPUT_STACK: for(int i = 0; i < MAX_DEPTH; i++) {
         #pragma HLS UNROLL
-        result.new_stack[i] = temp_stack[i];
+        result.nodes[i] = temp_stack.nodes[i];
     }
     
+    node_stream.write(result);
+
     return result;
 }
+

@@ -2,6 +2,7 @@
 #define BHTREE_CONFIG_HLS_H
 
 #include "bhtree_types_hls.h"
+#include "hls_stream.h"
 
 #define MAX_DEPTH 10
 #define MAX_PARTICLES (1U << 31)
@@ -27,6 +28,11 @@ struct nodeleaf {
     count_t num_particles;
 
     bool is_leaf;
+};
+
+struct nodeleaf_stack {
+    nodeleaf nodes[MAX_DEPTH];
+    level_t num_nodes;
 };
 
 #endif
