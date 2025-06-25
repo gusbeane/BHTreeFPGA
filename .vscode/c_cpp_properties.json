@@ -1,21 +1,25 @@
 {
     "configurations": [
         {
-            "name": "Mac",
+            "name": "Linux-Vitis",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/sw/include"
+                "${workspaceFolder}/hw/include",
+                "/opt/xilinx/2025.1/Vitis/include",
+                "/usr/include",
+                "/usr/include/c++/11",
+                "/usr/include/x86_64-linux-gnu/c++/11"
             ],
-            "defines": [],
-            "macFrameworkPath": [
-                "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks"
+            "defines": [
+                "__SYNTHESIS__",
+                "__VITIS_HLS__",
+                "_GLIBCXX_USE_CXX11_ABI=1"
             ],
-            "compilerPath": "/usr/bin/clang++",
+            "compilerPath": "/usr/bin/g++",
             "cStandard": "c17",
             "cppStandard": "c++11",
-            "intelliSenseMode": "macos-clang-x64",
-            "compileCommands": "${workspaceFolder}/compile_commands.json"
+            "intelliSenseMode": "linux-gcc-x64"
         }
     ],
     "version": 4
-} 
+}
