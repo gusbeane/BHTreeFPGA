@@ -8,6 +8,13 @@
 #define MAX_NODES (2 * MAX_PARTICLES)
 #define NLEAF 1
 
+struct particle_t {
+    pos_t pos[3];
+    mass_t mass;
+    count_t idx;
+    phkey_t key;
+};
+
 struct nodeleaf {
     phkey_t key;
     level_t level;
