@@ -177,3 +177,87 @@ PROCESS_PARTICLES:
   token_stream.write(token_t{(unsigned int)current_buf, (unsigned short)buf_idx, true});
 }
 
+// Write nodes to two independent AXI ports (tree0 / tree1) so that we can
+// sustain two writes per cycle when the interface width is eventually bumped
+// to 512-bit.  Nodes are written in an interleaved fashion: even index ➜ tree0,
+// odd index ➜ tree1.  Each tree pointer is connected to a distinct AXI master
+// interface bundle in the kernel top function.
+void node_writer(hls::stream<token_t> &token_stream,
+                 nodeleaf node_buffer_0[NODE_BUFFER_DEPTH],
+                 nodeleaf node_buffer_1[NODE_BUFFER_DEPTH],
+                 nodeleaf *tree0,
+                 nodeleaf *tree1) {
+  long long int idx = 0;
+  long long int idx0 = 0; // write index for tree0
+  long long int idx1 = 0; // write index for tree1
+
+  NODE_WRITE_LOOP: while(1) {
+    token_t t = token_stream.read();
+
+    // for(int i = 0; i < t.num_nodes; i++) {
+    //   switch(t.buffer_idx) {
+    //     case 0:
+    //       tree[idx++] = node_buffer_0[i];
+    //       break;
+    //     case 1:
+    //       tree[idx++] = node_buffer_1[i];
+    //       break;
+    //   }
+    // }
+
+        // Use fixed loop bounds for better HLS synthesis
+    // We stream out two nodes per iteration so that the scheduler can map
+    // each write to a different AXI interface (tree0 / tree1) and therefore
+    // maintain II=1.
+    WRITE_NODES: for(int i = 0; i < NODE_BUFFER_DEPTH; i += 2) {
+#pragma HLS PIPELINE II=1
+#pragma HLS LOOP_TRIPCOUNT min=1 max=64 avg=32
+      if (idx+i < t.num_nodes) {
+        // write even element to tree0
+        nodeleaf node_even = (t.buffer_idx == 0) ? node_buffer_0[i]
+                                                : node_buffer_1[i];
+        tree0[idx+i] = node_even;
+      }
+
+      if (idx+i + 1 < t.num_nodes) {
+        // write odd element to tree1
+        nodeleaf node_odd = (t.buffer_idx == 0) ? node_buffer_0[i + 1]
+                                               : node_buffer_1[i + 1];
+        tree1[idx+i+1] = node_odd;
+      }
+    }
+
+    idx += t.num_nodes; // keep global count unchanged for now (if used later)
+
+    if(t.is_last) break;
+  } 
+}
+
+void create_bhtree_kernel(hls::stream<particle_t> &particle_stream,
+                          nodeleaf *tree0,
+                          nodeleaf *tree1,
+                          count_t num_particles) {
+#pragma HLS DATAFLOW
+
+#pragma HLS INTERFACE m_axi port=tree0 offset=slave bundle=gmem0 depth=MAX_NODES max_widen_bitwidth=1024 max_write_burst_length=256
+#pragma HLS INTERFACE m_axi port=tree1 offset=slave bundle=gmem1 depth=MAX_NODES max_widen_bitwidth=1024 max_write_burst_length=256
+
+//   static nodeleaf node_buffer[2][NODE_BUFFER_DEPTH];
+// #pragma HLS ARRAY_PARTITION variable=node_buffer complete dim=1
+// #pragma HLS ARRAY_RESHAPE variable=node_buffer factor=MAX_DEPTH dim=2
+// #pragma HLS BIND_STORAGE variable=node_buffer type=RAM_2P impl=BRAM
+
+  nodeleaf node_buffer_0[NODE_BUFFER_DEPTH];
+  nodeleaf node_buffer_1[NODE_BUFFER_DEPTH];
+#pragma HLS ARRAY_PARTITION variable=node_buffer_0 cyclic factor=10 dim=1
+#pragma HLS ARRAY_PARTITION variable=node_buffer_1 cyclic factor=10 dim=1
+#pragma HLS BIND_STORAGE variable=node_buffer_0 type=RAM_2P impl=BRAM
+#pragma HLS BIND_STORAGE variable=node_buffer_1 type=RAM_2P impl=BRAM
+
+  hls::stream<token_t> token_stream("token_stream");
+#pragma HLS STREAM variable=token_stream depth=8
+
+  particle_processor(particle_stream, token_stream, node_buffer_0, node_buffer_1, num_particles);
+
+  node_writer(token_stream, node_buffer_0, node_buffer_1, tree0, tree1);
+}
