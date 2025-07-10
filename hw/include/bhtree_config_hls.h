@@ -30,14 +30,10 @@ struct nodeleaf {
     count_t num_particles; // 32 bits
 
     bool is_leaf; // 1 bit
+    bool is_last; // 1 bit
 
-    // total is 255 bits, pad to 256 bits
-    ap_uint<1> padding;
-};
-
-struct nodeleaf_stack {
-    nodeleaf nodes[MAX_DEPTH];
-    level_t num_nodes;
+    // total is 256 bits, no need to pad to 256 bits
+    // ap_uint<1> padding;
 };
 
 #endif
