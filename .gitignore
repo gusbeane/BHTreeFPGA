@@ -3,11 +3,14 @@ build/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
-Makefile
 
 # executables
 sw/bhtree
 sw/test_peano_hilbert
+hw/testbench/test_bhtree_manual
+
+# log files
+hw/testbench/test_results.log
 
 # Generated compilation database
 compile_commands.json
