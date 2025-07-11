@@ -45,7 +45,6 @@ INIT_STACK:
     active_stack[i].mass = p.mass;
     active_stack[i].num_particles = 1;
     active_stack[i].start_idx = 0;
-    active_stack[i].is_leaf = true;
     active_stack[i].is_last = false;
   }
 
@@ -122,7 +121,7 @@ PROCESS_PARTICLES:
 }
 
 void node_writer(hls::stream<nodeleaf> &node_stream,
-                 ap_uint<256> *tree) {
+                 ap_uint<512> *tree) {
   
   long long int idx = 0;
 
@@ -130,10 +129,20 @@ void node_writer(hls::stream<nodeleaf> &node_stream,
 #pragma HLS PIPELINE II=1
     
     nodeleaf node = node_stream.read();
+
+    // Now we close the node
+    node.pos[0] /= node.mass;
+    node.pos[1] /= node.mass;
+    node.pos[2] /= node.mass;
+
+    // Mark the node as a leaf if it has less than NLEAF particles
+    node.is_leaf = (node.num_particles <= NLEAF) || node.level == MAX_DEPTH;
+
+    std::cout << "Node " << idx << " is_leaf: " << node.is_leaf << std::endl;
     
-    // Reinterpret nodeleaf as ap_uint<256> for efficient AXI write
-    ap_uint<256> node_bits;
-    node_bits = *reinterpret_cast<ap_uint<256>*>(&node);
+    // Reinterpret nodeleaf as ap_uint<512> for efficient AXI write
+    ap_uint<512> node_bits;
+    node_bits = *reinterpret_cast<ap_uint<512>*>(&node);
     
     tree[idx] = node_bits;
     idx++;
@@ -143,7 +152,7 @@ void node_writer(hls::stream<nodeleaf> &node_stream,
 }
 
 void create_bhtree_kernel(hls::stream<particle_t> &particle_stream,
-                          ap_uint<256> *tree,
+                          ap_uint<512> *tree,
                           count_t num_particles) {
 #pragma HLS DATAFLOW
 
