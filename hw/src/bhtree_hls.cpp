@@ -39,9 +39,9 @@ INIT_STACK:
 #pragma HLS UNROLL
     active_stack[i].key = p.key >> (3 * (MAX_DEPTH - (i + 1)));
     active_stack[i].level = i + 1;
-    active_stack[i].pos[0] = p.pos[0];
-    active_stack[i].pos[1] = p.pos[1];
-    active_stack[i].pos[2] = p.pos[2];
+    active_stack[i].pos[0] = p.pos[0] * p.mass;
+    active_stack[i].pos[1] = p.pos[1] * p.mass;
+    active_stack[i].pos[2] = p.pos[2] * p.mass;
     active_stack[i].mass = p.mass;
     active_stack[i].num_particles = 1;
     active_stack[i].start_idx = 0;
