@@ -171,9 +171,27 @@ bool test_simple_manual_particles() {
     
     std::cout << "Total mass in tree: " << total_mass << " (expected: 1.0)" << std::endl;
     if (std::abs(total_mass - 1.0) > 0.01) {
-        std::cout << "WARNING: Total mass mismatch!" << std::endl;
+      std::cout << "ERROR: Total mass mismatch!" << std::endl;
+      test_passed = false;
     }
-    
+
+    // Now we loop over the nodes and check that their center of mass matches
+    // the position of their respective particle
+    for (int i = 0; i < num_nodes; i++) {
+      nodeleaf node = convert_output_node(tree_output[i]);
+      if (abs(double(node.pos[0]) - test_particles[i].x) > 0.01 ||
+          abs(double(node.pos[1]) - test_particles[i].y) > 0.01 ||
+          abs(double(node.pos[2]) - test_particles[i].z) > 0.01) {
+        std::cout << "ERROR: Node " << i
+                  << " center of mass does not match particle position!"
+                  << std::endl;
+        test_passed = false;
+      }
+      else {
+        std::cout << "Node " << i << " center of mass matches particle position!" << std::endl;
+      }
+    }
+
     return test_passed;
 }
 
