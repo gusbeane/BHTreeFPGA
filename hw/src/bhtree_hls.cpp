@@ -22,6 +22,24 @@ nodeleaf add_particle_to_node(const nodeleaf &input_node,
   return output_node;
 }
 
+nodeleaf generate_empty_node(phkey_t node_key, level_t level) {
+#pragma HLS INLINE
+
+  nodeleaf node;
+  node.key = node_key;
+  node.level = level;
+  node.pos[0] = 0;
+  node.pos[1] = 0;
+  node.pos[2] = 0;
+  node.mass = 0;
+  node.num_particles = 0;
+  node.start_idx = 0;
+  node.is_leaf = true;
+  node.is_last = false;
+
+  return node;
+}
+
 void particle_processor(hls::stream<particle_t> &particle_stream,
                         hls::stream<nodeleaf> &node_stream,
                         count_t num_particles) {
@@ -37,15 +55,8 @@ void particle_processor(hls::stream<particle_t> &particle_stream,
 INIT_STACK:
   for (int i = 0; i < MAX_DEPTH; i++) {
 #pragma HLS UNROLL
-    active_stack[i].key = p.key >> (3 * (MAX_DEPTH - (i + 1)));
-    active_stack[i].level = i + 1;
-    active_stack[i].pos[0] = p.pos[0] * p.mass;
-    active_stack[i].pos[1] = p.pos[1] * p.mass;
-    active_stack[i].pos[2] = p.pos[2] * p.mass;
-    active_stack[i].mass = p.mass;
-    active_stack[i].num_particles = 1;
-    active_stack[i].start_idx = 0;
-    active_stack[i].is_last = false;
+    nodeleaf new_node = generate_empty_node(p.key >> (3 * (MAX_DEPTH - (i + 1))), i + 1);
+    active_stack[i] = add_particle_to_node(new_node, p, true);
   }
 
 PROCESS_PARTICLES:
@@ -77,18 +88,7 @@ PROCESS_PARTICLES:
           quiet_mode = true;
         }
 
-        nodeleaf new_node;
-        new_node.key = node_key;
-        new_node.level = level;
-        new_node.pos[0] = 0;
-        new_node.pos[1] = 0;
-        new_node.pos[2] = 0;
-        new_node.mass = 0;
-        new_node.num_particles = 0;
-        new_node.start_idx = 0;
-        new_node.is_leaf = true;
-        new_node.is_last = false;
-
+        nodeleaf new_node = generate_empty_node(node_key, level);
         active_stack[level - 1] = add_particle_to_node(new_node, p, true);
       }
     }
