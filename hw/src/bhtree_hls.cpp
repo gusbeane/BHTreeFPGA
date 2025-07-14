@@ -2,6 +2,10 @@
 #include "bhtree_types_hls.h"
 #include <cstring>
 
+#ifndef __SYNTHESIS__
+#include <iostream>
+#endif
+
 nodeleaf add_particle_to_node(const nodeleaf &input_node,
                               const particle_t &particle, bool set_idx) {
 #pragma HLS INLINE
@@ -137,9 +141,9 @@ void node_writer(hls::stream<nodeleaf> &node_stream,
 
     // Mark the node as a leaf if it has less than NLEAF particles
     node.is_leaf = (node.num_particles <= NLEAF) || node.level == MAX_DEPTH;
-
+#ifndef __SYNTHESIS__
     std::cout << "Node " << idx << " is_leaf: " << node.is_leaf << std::endl;
-    
+#endif
     // Reinterpret nodeleaf as ap_uint<512> for efficient AXI write
     ap_uint<512> node_bits;
     node_bits = *reinterpret_cast<ap_uint<512>*>(&node);
