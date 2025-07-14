@@ -95,7 +95,7 @@ PROCESS_PARTICLES:
 
     // Write result nodes to stream one at a time
     for (int j = 0; j < result_stack_num_nodes; j++) {
-      node_stream.write(result_stack[j]);
+      node_stream.write(result_stack[result_stack_num_nodes - j - 1]);
     }
   }
 
@@ -116,7 +116,7 @@ PROCESS_PARTICLES:
   }
 
   for (int j = 0; j < result_stack_num_nodes; j++) {
-    node_stream.write(result_stack[j]);
+    node_stream.write(result_stack[result_stack_num_nodes - j - 1]);
   }
 }
 
