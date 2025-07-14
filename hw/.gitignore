@@ -1,20 +1,55 @@
-# Ignore build output directory
-/build
-/export
+# Multi-Kernel HLS Build System .gitignore
 
-# Ignore object files and dependent files
-.o
-.d
+# Build output directories
+/build/
+/export/
 
-#Ignore logs folder and log files
-/logs
-.log
+# Object files and dependent files
+*.o
+*.d
 
-#Ignore lock files
-.lock
+# Logs folder and log files
+/logs/
+*.log
 
-.bin
-.pdi
-.vitisWorkspace.json
+# Lock files
+*.lock
 
+# Vitis specific files
+*.bin
+*.pdi
+*.vitisWorkspace.json
+
+# IDE files
 _ide/
+.analyzer_session.json
+
+# Testbench generated files
+tb/test_results.log
+tb/test_data/generated_*
+
+# Build artifacts in config directories
+config/*/hls_csim/
+config/*/hls_syn/
+config/*/hls_cosim/
+config/*/hls_package/
+
+# Cache directories
+.cache/
+.Xil/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Generated executables
+tb/test_bhtree_hls
+scripts/test_*
+
+# Component work directories (if accidentally created in wrong location)
+bhtree/
+bhtreewalk/
+
+# Backup files
+*.bak
+*.orig
