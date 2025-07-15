@@ -38,6 +38,10 @@ case $OPERATION in
         echo "Running package..."
         vitis-run --mode hls --package --config hls_config.cfg --work_dir ../../build/bhtree
         ;;
+    impl)
+        echo "Running implementation..."
+        vitis-run --mode hls --impl --config hls_config.cfg --work_dir ../../build/bhtree
+        ;;
     *)
         echo "Error: Unknown operation '$OPERATION'"
         echo "Usage: $0 [csim|syn|cosim|package]"

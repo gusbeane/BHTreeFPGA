@@ -182,7 +182,7 @@ bool test_simple_manual_particles() {
         print_particle(p, i);
     }
     
-    std::vector<ap_uint<512>> tree_output(50); // Small buffer for simple test
+    std::vector<ap_uint<512>> tree_output(128); // Small buffer for simple test
     
     std::cout << "\nRunning HLS kernel on manual particles..." << std::endl;
     create_bhtree_kernel(particle_stream, tree_output.data(), NUM_PARTICLES);
@@ -294,7 +294,7 @@ bool test_at_max_depth() {
         particle_stream.write(p);
         print_particle(p, i);
     }
-    std::vector<ap_uint<512>> tree_output(50); // Small buffer for simple test
+    std::vector<ap_uint<512>> tree_output(128); // Small buffer for simple test
     
     std::cout << "\nRunning HLS kernel on manual particles..." << std::endl;
     create_bhtree_kernel(particle_stream, tree_output.data(), NUM_PARTICLES);

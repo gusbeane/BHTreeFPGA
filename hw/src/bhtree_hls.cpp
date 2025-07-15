@@ -158,9 +158,12 @@ void node_writer(hls::stream<nodeleaf> &node_stream,
 void create_bhtree_kernel(hls::stream<particle_t> &particle_stream,
                           ap_uint<512> *tree,
                           count_t num_particles) {
-#pragma HLS DATAFLOW
+#pragma HLS INTERFACE m_axi port=tree offset=slave bundle=gmem0 depth=128 max_widen_bitwidth=512 max_write_burst_length=64 num_write_outstanding=16 latency=64
+#pragma HLS INTERFACE s_axilite port=num_particles bundle=control
+#pragma HLS INTERFACE s_axilite port=tree bundle=control
+#pragma HLS INTERFACE s_axilite port=return bundle=control
 
-#pragma HLS INTERFACE m_axi port=tree offset=slave bundle=gmem0 depth=MAX_NODES max_widen_bitwidth=512 max_write_burst_length=64 num_write_outstanding=16 num_read_outstanding=16 latency=64
+#pragma HLS DATAFLOW
 
   hls::stream<nodeleaf> node_stream("node_stream");
 #pragma HLS STREAM variable=node_stream depth=64
