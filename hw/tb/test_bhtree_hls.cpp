@@ -3,15 +3,18 @@
 #include <iomanip>
 #include <algorithm>
 #include <cmath>
+#include <array>
 
 // Include HLS headers
 #include "../include/bhtree_config_hls.h"
 #include "../include/bhtree_types_hls.h"
 #include "../include/peano_hilbert.h"
-#include "hls_stream.h"
+
+const int TREE_DEPTH = 1024;
+const int PARTICLE_DEPTH = 1024;
 
 // Forward declaration of HLS kernel
-void create_bhtree_kernel(hls::stream<particle_t> &particle_stream,
+void create_bhtree_kernel(const particle_t *particles,
                           ap_uint<512> *tree,
                           count_t num_particles);
 
@@ -169,7 +172,7 @@ bool test_simple_manual_particles() {
     }
     
     // Convert to HLS format and run kernel
-    hls::stream<particle_t> particle_stream("manual_test");
+    particle_t particles[PARTICLE_DEPTH];
     for (int i = 0; i < NUM_PARTICLES; i++) {
         int orig_idx = key_index_pairs[i].second;
         uint32_t key = key_index_pairs[i].first;
@@ -178,14 +181,14 @@ bool test_simple_manual_particles() {
                                            test_particles[orig_idx].z,
                                            test_particles[orig_idx].mass,
                                            key, i);
-        particle_stream.write(p);
+        particles[i] = p;
         print_particle(p, i);
     }
     
-    std::vector<ap_uint<512>> tree_output(128); // Small buffer for simple test
+    std::vector<ap_uint<512>> tree_output(TREE_DEPTH); // Small buffer for simple test
     
     std::cout << "\nRunning HLS kernel on manual particles..." << std::endl;
-    create_bhtree_kernel(particle_stream, tree_output.data(), NUM_PARTICLES);
+    create_bhtree_kernel(particles, tree_output.data(), NUM_PARTICLES);
     
     // Analyze output
     int num_nodes = 0;
@@ -252,7 +255,7 @@ bool test_at_max_depth() {
     const int NUM_PARTICLES = 10;
 
     // Manually create particles at different octants
-    std::vector<TestParticle> test_particles(NUM_PARTICLES);
+    std::vector<TestParticle> test_particles(PARTICLE_DEPTH);
     double step = (1.0 / pow(2, MAX_DEPTH));
     for (int i = 0; i < NUM_PARTICLES; i++) {
         test_particles[i] = {0.1 + i*step/NUM_PARTICLES, 0.1, 0.1, 1.0/double(NUM_PARTICLES)};
@@ -282,7 +285,7 @@ bool test_at_max_depth() {
     }
     
     // Convert to HLS format and run kernel
-    hls::stream<particle_t> particle_stream("manual_test");
+    particle_t particles[PARTICLE_DEPTH];
     for (int i = 0; i < NUM_PARTICLES; i++) {
         int orig_idx = key_index_pairs[i].second;
         uint32_t key = key_index_pairs[i].first;
@@ -291,13 +294,13 @@ bool test_at_max_depth() {
                                            test_particles[orig_idx].z,
                                            test_particles[orig_idx].mass,
                                            key, i);
-        particle_stream.write(p);
+        particles[i] = p;
         print_particle(p, i);
     }
-    std::vector<ap_uint<512>> tree_output(128); // Small buffer for simple test
+    std::vector<ap_uint<512>> tree_output(TREE_DEPTH); // Small buffer for simple test
     
     std::cout << "\nRunning HLS kernel on manual particles..." << std::endl;
-    create_bhtree_kernel(particle_stream, tree_output.data(), NUM_PARTICLES);
+    create_bhtree_kernel(particles, tree_output.data(), NUM_PARTICLES);
 
     // Print output output
     int num_nodes = 0;

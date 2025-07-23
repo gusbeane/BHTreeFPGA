@@ -44,11 +44,11 @@ nodeleaf generate_empty_node(phkey_t node_key, level_t level) {
   return node;
 }
 
-void particle_processor(hls::stream<particle_t> &particle_stream,
+void particle_processor(const particle_t *particles,
                         hls::stream<nodeleaf> &node_stream,
                         count_t num_particles) {
 
-  particle_t p = particle_stream.read();
+  particle_t p = particles[0];
 
   nodeleaf active_stack[MAX_DEPTH];
   nodeleaf result_stack[MAX_DEPTH];
@@ -65,7 +65,7 @@ INIT_STACK:
 
 PROCESS_PARTICLES:
   for (int i = 1; i < num_particles; i++) {
-    p = particle_stream.read();
+    p = particles[i];
 
     bool flush_mode = false;
     bool quiet_mode = false;
@@ -155,10 +155,11 @@ void node_writer(hls::stream<nodeleaf> &node_stream,
   }
 }
 
-void create_bhtree_kernel(hls::stream<particle_t> &particle_stream,
-                          ap_uint<512> *tree,
+void create_bhtree_kernel(const particle_t *particles, ap_uint<512> *tree,
                           count_t num_particles) {
-#pragma HLS INTERFACE m_axi port=tree offset=slave bundle=gmem0 depth=128 max_widen_bitwidth=512 max_write_burst_length=64 num_write_outstanding=16 latency=64
+#pragma HLS INTERFACE m_axi port = particles bundle = gmem0 depth = 1024
+#pragma HLS INTERFACE m_axi port = tree offset = slave bundle = gmem1 depth = 1024 max_widen_bitwidth = 512 max_write_burst_length = 64 num_write_outstanding = 16 latency = 64
+#pragma HLS INTERFACE s_axilite port=particles bundle=control
 #pragma HLS INTERFACE s_axilite port=num_particles bundle=control
 #pragma HLS INTERFACE s_axilite port=tree bundle=control
 #pragma HLS INTERFACE s_axilite port=return bundle=control
@@ -168,6 +169,6 @@ void create_bhtree_kernel(hls::stream<particle_t> &particle_stream,
   hls::stream<nodeleaf> node_stream("node_stream");
 #pragma HLS STREAM variable=node_stream depth=64
 
-  particle_processor(particle_stream, node_stream, num_particles);
+  particle_processor(particles, node_stream, num_particles);
   node_writer(node_stream, tree);
 }
