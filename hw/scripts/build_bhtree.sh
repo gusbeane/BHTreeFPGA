@@ -42,9 +42,13 @@ case $OPERATION in
         echo "Running implementation..."
         vitis-run --mode hls --impl --config hls_config.cfg --work_dir ../../build/bhtree
         ;;
+    link)
+        echo "Running link..."
+        v++ -l ../../build/bhtree/create_bhtree_kernel.xo --platform xilinx_u200_gen3x16_xdma_2_202110_1 -o ../../build/bhtree/create_bhtree_kernel.xclbin
+        ;;
     *)
         echo "Error: Unknown operation '$OPERATION'"
-        echo "Usage: $0 [csim|syn|cosim|package]"
+        echo "Usage: $0 [csim|syn|cosim|package|impl|link]"
         exit 1
         ;;
 esac
