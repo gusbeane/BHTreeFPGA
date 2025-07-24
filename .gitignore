@@ -26,3 +26,4 @@ compile_commands.json
 hw/.analyzer_session.json
 
 bhvenv/
+hw/emconfig.json
