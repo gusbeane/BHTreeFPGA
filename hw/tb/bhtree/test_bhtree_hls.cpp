@@ -6,9 +6,9 @@
 #include <array>
 
 // Include HLS headers
-#include "../include/bhtree_config_hls.h"
-#include "../include/bhtree_types_hls.h"
-#include "../include/peano_hilbert.h"
+#include "bhtree_config_hls.h"
+#include "bhtree_types_hls.h"
+#include "peano_hilbert.h"
 
 const int TREE_DEPTH = 1024;
 const int PARTICLE_DEPTH = 1024;
