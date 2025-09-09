@@ -1,12 +1,12 @@
 # Makefile for Vitis HLS multi-kernel build
 # Place this Makefile at your project root directory
 # Usage: make [target] KERNEL=<kernel_name>
-# Example: make syn KERNEL=bhtree
+# Example: make syn KERNEL=treecon
 # Available targets: csim, syn, cosim, package, impl, link, clean
 
 # Default kernel if none specified
 # You can override this by running: make csim KERNEL=my_other_kernel
-KERNEL ?= bhtree
+KERNEL ?= treecon
 
 # Variables - these store values we'll reuse throughout the Makefile
 # $(shell ...) runs a shell command and captures its output
@@ -97,15 +97,15 @@ list-kernels:
 	@ls $(HW_DIR)/config/ 2>/dev/null || echo "No config directories found"
 
 # Convenience targets for common kernels (add your kernel names here)
-# These let you run "make bhtree-syn" instead of "make syn KERNEL=bhtree"
-bhtree-csim:
-	@$(MAKE) csim KERNEL=bhtree
+# These let you run "make treecon-syn" instead of "make syn KERNEL=treecon"
+treecon-csim:
+	@$(MAKE) csim KERNEL=treecon
 
-bhtree-syn:
-	@$(MAKE) syn KERNEL=bhtree
+treecon-syn:
+	@$(MAKE) syn KERNEL=treecon
 
-bhtree-cosim:
-	@$(MAKE) cosim KERNEL=bhtree
+treecon-cosim:
+	@$(MAKE) cosim KERNEL=treecon
 
 # Add more convenience targets for other kernels as needed:
 # example_kernel-csim:
@@ -133,11 +133,11 @@ help:
 	@echo "  help    - Show this help message"
 	@echo ""
 	@echo "Examples:"
-	@echo "  make syn KERNEL=bhtree"
+	@echo "  make syn KERNEL=treecon"
 	@echo "  make csim KERNEL=my_other_kernel" 
-	@echo "  make bhtree-syn    (convenience target)"
+	@echo "  make treecon-syn    (convenience target)"
 	@echo ""
 	@echo "Default kernel: $(KERNEL)"
 
 # .PHONY tells Make these targets don't create files with the same name
-.PHONY: csim syn cosim package impl link clean clean-all list-kernels help bhtree-csim bhtree-syn bhtree-cosim
+.PHONY: csim syn cosim package impl link clean clean-all list-kernels help treecon-csim treecon-syn treecon-cosim

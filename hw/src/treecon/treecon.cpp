@@ -1,5 +1,5 @@
-#include "bhtree_config_hls.h"
-#include "bhtree_types_hls.h"
+#include "treecon_config_hls.h"
+#include "treecon_types_hls.h"
 #include <cstring>
 
 #ifndef __SYNTHESIS__

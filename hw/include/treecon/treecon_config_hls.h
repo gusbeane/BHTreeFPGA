@@ -1,7 +1,7 @@
-#ifndef BHTREE_CONFIG_HLS_H
-#define BHTREE_CONFIG_HLS_H
+#ifndef TREECON_CONFIG_HLS_H
+#define TREECON_CONFIG_HLS_H
 
-#include "bhtree_types_hls.h"
+#include "treecon_types_hls.h"
 #include "hls_stream.h"
 
 const unsigned int MAX_DEPTH = 10;

@@ -6,8 +6,8 @@
 #include <array>
 
 // Include HLS headers
-#include "bhtree_config_hls.h"
-#include "bhtree_types_hls.h"
+#include "treecon_config_hls.h"
+#include "treecon_types_hls.h"
 #include "peano_hilbert.h"
 
 const int TREE_DEPTH = 1024;

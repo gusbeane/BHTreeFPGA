@@ -1,5 +1,5 @@
-#ifndef BHTREE_TYPES_HLS_H
-#define BHTREE_TYPES_HLS_H
+#ifndef TREECON_TYPES_HLS_H
+#define TREECON_TYPES_HLS_H
 
 // Type definitions for Vitis HLS
 
@@ -14,4 +14,4 @@ typedef ap_ufixed<32,0> mass_t; // mass type
 
 typedef int count_t;
 
-#endif // BHTREE_TYPES_HLS_H
+#endif // TREECON_TYPES_HLS_H

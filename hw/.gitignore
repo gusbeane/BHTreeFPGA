@@ -37,18 +37,20 @@ config/*/hls_package/
 # Cache directories
 .cache/
 .Xil/
+.ipcache/
+_x/
 
 # Temporary files
 *.tmp
 *.temp
 
 # Generated executables
-tb/test_bhtree_hls
+tb/test_treecon
 scripts/test_*
 
 # Component work directories (if accidentally created in wrong location)
-bhtree/
-bhtreewalk/
+build/treecon/
+build/treewalk/
 
 # Backup files
 *.bak
