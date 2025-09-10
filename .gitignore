@@ -27,3 +27,4 @@ hw/.analyzer_session.json
 
 bhvenv/
 hw/emconfig.json
+sw/Makefile

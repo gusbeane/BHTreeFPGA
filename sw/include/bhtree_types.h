@@ -18,6 +18,7 @@ struct NodeOrLeaf {
     // particle information
     unsigned int start_idx; // start index in the particle array
     unsigned int Nparticles; // number of particles in the node
+    unsigned int next_sibling; // index of the next sibling in the tree, or sibling of parent if this is the last child
     
     // center of mass. if the node is a leaf and has only 1 particle, these store the particle's data
     // otherwise, for leaves you need to go back to the particle array
