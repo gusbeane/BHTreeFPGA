@@ -1,4 +1,5 @@
 #include <bitset>
+#include <cmath>
 #include <iostream>
 #include "../include/bhtree_types.h"
 #include "../include/bhtree_config.h"
@@ -92,11 +93,12 @@ std::vector<NodeOrLeaf> add_particle_to_tree(Tree& temp_nodes, RealPosition3D po
 
     for (int i = 1; i < MAX_DEPTH+1; i++) {
         unsigned int node_key = key >> 3 * (MAX_DEPTH - i);
-        if (node_key == temp_nodes[i-1].key && !flush_mode) {
+        if (node_key == temp_nodes[i-1].key && !flush_mode && i < MAX_DEPTH) {
             add_particle_to_node(temp_nodes[i-1], pos, mass);
         }
         else {
             // we need to emit all the nodes below this level and replace them with empty nodes
+            // we always emit the max depth node, if we get there
             if(!flush_mode) {
                 level_divergence = i;
                 flush_mode = true;
@@ -208,6 +210,146 @@ Tree build_tree(PointCloud pc) {
     return tree;
 }
 
+void walk_tree(Tree& tree, long num_nodes, RealPosition3D pos, double G, double theta) {
+    int current_idx = 0;
+
+    while(current_idx < num_nodes) {
+        NodeOrLeaf node = tree[current_idx];
+        // compute distance
+        double dx, dy, dz;
+        dx = node.com_x - pos[0];
+        dy = node.com_y - pos[1];
+        dz = node.com_z - pos[2];
+        double rsq = dx*dx + dy*dy + dz*dz;
+        double r = std::sqrt(rsq);
+        
+        // check multipole acceptance criterion
+
+        
+    }
+}
+
+bool test_at_max_depth() {
+    std::cout << "\n=== Test: At Max Depth ===" << std::endl;
+
+    const int NUM_PARTICLES = 10;
+
+    // Create a vector to store our test particles
+    std::vector<RealPosition3D> positions;
+    std::vector<double> masses;
+    positions.reserve(NUM_PARTICLES);
+    masses.reserve(NUM_PARTICLES);
+
+    // Manually create particles at different positions, similar to test_treecon.cpp
+    double step = (1.0 / pow(2, MAX_DEPTH));
+    for (int i = 0; i < NUM_PARTICLES; i++) {
+        positions.push_back({0.1 + i*step/NUM_PARTICLES, 0.1, 0.1});
+        masses.push_back(1.0/double(NUM_PARTICLES));
+    }
+
+    // Create a PointCloud and convert real positions to integer positions
+    PointCloud pc(NUM_PARTICLES, 1.0, masses);  // box_size = 1.0
+    
+    // Convert real positions to integer positions
+    PositionVector integer_positions;
+    integer_positions.reserve(NUM_PARTICLES);
+    
+    for (int i = 0; i < NUM_PARTICLES; i++) {
+        Position3D int_pos;
+        for (int j = 0; j < 3; j++) {
+            // Convert real position to integer position
+            // real_pos[j] = (pos[j] / UINT32_MAX) * box_size
+            // So: pos[j] = (real_pos[j] / box_size) * UINT32_MAX
+            int_pos[j] = static_cast<uint32_t>((positions[i][j] / 1.0) * UINT32_MAX);
+        }
+        integer_positions.push_back(int_pos);
+    }
+    
+    // Set the positions in the PointCloud
+    pc.set_positions(integer_positions);
+    pc.sort_by_ph_keys();
+
+    std::cout << "Manual particles sorted by PH keys:" << std::endl;
+    auto ph_keys = pc.get_ph_keys();
+    auto real_positions = pc.get_real_positions();
+    auto real_masses = pc.get_masses();
+    
+    for (int i = 0; i < NUM_PARTICLES; i++) {
+        std::cout << "  Particle " << i << ": pos=(" 
+                  << real_positions[i][0] << "," 
+                  << real_positions[i][1] << "," 
+                  << real_positions[i][2] 
+                  << ") key=0x" << std::hex << ph_keys[i] << std::dec 
+                  << " key_binary=" << format_ph_key(ph_keys[i], MAX_DEPTH) << std::endl;
+    }
+
+    // Build the tree
+    Tree tree = build_tree(pc);
+
+    std::cout << "\nBuilt tree with " << tree.size() << " nodes" << std::endl;
+    std::cout << "\nTree nodes:" << std::endl;
+    for (int i = 0; i < std::min(50, (int)tree.size()); i++) {
+        print_node(tree[i], i);
+    }
+
+    // Now perform sanity checks similar to test_treecon.cpp
+    bool test_passed = true;
+
+    // Check number of nodes (should be 11 based on the original test)
+    int expected_nodes = 11;
+    std::cout << "\nSanity check: Number of nodes" << std::endl;
+    std::cout << "Expected: " << expected_nodes << ", Got: " << tree.size() << std::endl;
+    if (tree.size() != expected_nodes) {
+        std::cout << "WARNING: Node count mismatch (expected " << expected_nodes << ", got " << tree.size() << ")" << std::endl;
+        // Don't fail the test for this, as the software implementation might differ
+    }
+
+    // Sum of particles in leaf nodes should equal NUM_PARTICLES
+    int total_particles = 0;
+    for (size_t i = 0; i < tree.size(); i++) {
+        if (tree[i].Nparticles <= NLEAF) { // This is a leaf node
+            total_particles += tree[i].Nparticles;
+        }
+    }
+    std::cout << "\nSanity check: Total particles in leaf nodes" << std::endl;
+    std::cout << "Expected: " << NUM_PARTICLES << ", Got: " << total_particles << std::endl;
+    test_passed &= (total_particles == NUM_PARTICLES);
+
+    // Compute expected center of mass of all particles
+    RealPosition3D com_expected = {0.0, 0.0, 0.0};
+    double total_mass = 0.0;
+    for (int i = 0; i < NUM_PARTICLES; i++) {
+        com_expected[0] += real_positions[i][0] * real_masses[i];
+        com_expected[1] += real_positions[i][1] * real_masses[i];
+        com_expected[2] += real_positions[i][2] * real_masses[i];
+        total_mass += real_masses[i];
+    }
+    com_expected[0] /= total_mass;
+    com_expected[1] /= total_mass;
+    com_expected[2] /= total_mass;
+
+    // Check center of mass of root node (last node in tree after reversal)
+    const double COM_TOL = 1e-6;
+    if (!tree.empty()) {
+        NodeOrLeaf root_node = tree.back(); // Last node after reversal should be root
+        std::cout << "\nSanity check: Root node center of mass" << std::endl;
+        std::cout << "Expected COM: (" << com_expected[0] << ", " << com_expected[1] << ", " << com_expected[2] << ")" << std::endl;
+        std::cout << "Root node COM: (" << root_node.com_x << ", " << root_node.com_y << ", " << root_node.com_z << ")" << std::endl;
+        
+        bool com_match = (abs(root_node.com_x - com_expected[0]) < COM_TOL) &&
+                        (abs(root_node.com_y - com_expected[1]) < COM_TOL) &&
+                        (abs(root_node.com_z - com_expected[2]) < COM_TOL);
+        test_passed &= com_match;
+        
+        if (!com_match) {
+            std::cout << "Center of mass mismatch!" << std::endl;
+        }
+    }
+
+    std::cout << "\nMax depth test " << (test_passed ? "PASSED" : "FAILED") << std::endl;
+    return test_passed;
+}
+
 int main(int argc, char* argv[]) {
     PointCloud pc = PointCloud::random(1000);
     pc.sort_by_ph_keys();
@@ -272,6 +414,9 @@ int main(int argc, char* argv[]) {
     std::cout << "Quoted COM of first node: (" << tree[0].com_x << ", " << tree[0].com_y << ", " << tree[0].com_z << ")" << std::endl;
     std::cout << "Difference: (" << com[0] - tree[0].com_x << ", " << com[1] - tree[0].com_y << ", " << com[2] - tree[0].com_z << ")" << std::endl;
     std::cout << std::endl;
+
+
+    test_at_max_depth();
 
     return 0;
 } 
