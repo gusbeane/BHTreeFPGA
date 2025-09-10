@@ -169,9 +169,8 @@ void PointCloud::generate_random_positions(size_t num_points) {
     positions.clear();
     positions.reserve(num_points);
     
-    // Create random number generator
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    // Create random number generator with fixed seed for reproducibility
+    std::mt19937 gen(42);
     std::uniform_int_distribution<uint32_t> dis(0, UINT32_MAX);
     
     for (size_t i = 0; i < num_points; i++) {
