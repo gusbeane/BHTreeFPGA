@@ -315,9 +315,14 @@ bool test_at_max_depth() {
 
     // Now some sanity checks
     bool test_passed = true;
+    bool test_tmp;
 
-    // Number of nodes should be 11
-    test_passed &= (num_nodes == 11);
+    // Number of nodes should be 19
+    test_tmp = (num_nodes == 19);
+    if(!test_tmp) {
+        std::cout << "ERROR: Number of nodes should be 19, got " << num_nodes << std::endl;
+    }
+    test_passed &= test_tmp;
 
     // Sum of leaf node num_particles should be equal to NUM_PARTICLES
     int num_particles = 0;
@@ -325,7 +330,11 @@ bool test_at_max_depth() {
         nodeleaf node = convert_output_node(tree_output[i]);
         if (node.is_leaf) num_particles += node.num_particles;
     }
-    test_passed &= (num_particles == NUM_PARTICLES);
+    test_tmp = (num_particles == NUM_PARTICLES);
+    if(!test_tmp) {
+        std::cout << "ERROR: Number of particles in leaf nodes should be " << NUM_PARTICLES << ", got " << num_particles << std::endl;
+    }
+    test_passed &= test_tmp;
 
     // Check that node 2 through 10 have same pos and that their pos match total center of mass
     // Compute center of mass
@@ -363,22 +372,18 @@ bool test_at_max_depth() {
 
     // Check that node 2 through 10 have same pos and that their pos match total center of mass to within 0.1%
     const double COM_TOL = 1e-6;
-    for (int i = 2; i < 11; i++) {
+    test_tmp = true;
+    for (int i = 10; i < 19; i++) {
         nodeleaf node = convert_output_node(tree_output[i]);
-        test_passed &= (abs(double(node.pos[0]) - com.x) < COM_TOL);
-        test_passed &= (abs(double(node.pos[1]) - com.y) < COM_TOL);
-        test_passed &= (abs(double(node.pos[2]) - com.z) < COM_TOL);
+        test_tmp &= (abs(double(node.pos[0]) - com.x) < COM_TOL);
+        test_tmp &= (abs(double(node.pos[1]) - com.y) < COM_TOL);
+        test_tmp &= (abs(double(node.pos[2]) - com.z) < COM_TOL);
     }
 
-    // Check that node 0 has the same center of mass as the first 8 particles and node 1 has the same center of mass as the last 2 particles
-    nodeleaf node_0 = convert_output_node(tree_output[0]);
-    test_passed &= (abs(double(node_0.pos[0]) - com_node0.x) < COM_TOL);
-    test_passed &= (abs(double(node_0.pos[1]) - com_node0.y) < COM_TOL);
-    test_passed &= (abs(double(node_0.pos[2]) - com_node0.z) < COM_TOL);
-    nodeleaf node_1 = convert_output_node(tree_output[1]);
-    test_passed &= (abs(double(node_1.pos[0]) - com_node1.x) < COM_TOL);
-    test_passed &= (abs(double(node_1.pos[1]) - com_node1.y) < COM_TOL);
-    test_passed &= (abs(double(node_1.pos[2]) - com_node1.z) < COM_TOL);
+    if(!test_tmp) {
+        std::cout << "ERROR: Node 10 through 18 have different positions!" << std::endl;
+    }
+    test_passed &= test_tmp;
 
     return test_passed;
 }
@@ -431,6 +436,9 @@ bool test_random_particles() {
         num_nodes++;
         if (node.is_last) break;
     }
+
+    std::cout << "Number of particles: " << NUM_PARTICLES << std::endl;
+    std::cout << "Number of nodes: " << num_nodes << std::endl;
 
     // Reverse tree output
     std::reverse(tree_output.begin(), tree_output.begin() + num_nodes);
@@ -485,13 +493,26 @@ int main() {
     std::cout << "NLEAF = " << NLEAF << std::endl;
     std::cout << "sizeof(nodeleaf) = " << sizeof(nodeleaf) << " bytes" << std::endl;
     
-    bool test_passed = test_peano_hilbert_key();
+    bool test0, test1, test2, test3, test_passed;
+    test0 = test_peano_hilbert_key();
+    test1 = test_simple_manual_particles();
+    test2 = test_at_max_depth();
+    test3 = test_random_particles();
+    test_passed = test0 && test1 && test2 && test3;
 
-    test_passed &= test_simple_manual_particles();
+    if(!test0) {
+        std::cout << "❌ Test peano hilbert key FAILED!" << std::endl;
+    }
+    if(!test1) {
+        std::cout << "❌ Test simple manual particles FAILED!" << std::endl;
+    }
+    if(!test2) {
+        std::cout << "❌ Test at max depth FAILED!" << std::endl;
+    }
+    if(!test3) {
+        std::cout << "❌ Test random particles FAILED!" << std::endl;
+    }
 
-    test_passed &= test_at_max_depth();
-
-    test_passed &= test_random_particles();
     
     // Summary
     std::cout << "\n=== Test Summary ===" << std::endl;

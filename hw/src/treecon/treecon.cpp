@@ -79,7 +79,7 @@ PROCESS_PARTICLES:
 
       phkey_t node_key = p.key >> (3 * (MAX_DEPTH - level));
 
-      if (node_key == active_stack[level - 1].key && !flush_mode) {
+      if (node_key == active_stack[level - 1].key && !flush_mode && level < MAX_DEPTH) {
         active_stack[level - 1] =
             add_particle_to_node(active_stack[level - 1], p, false);
       } else {
