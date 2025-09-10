@@ -28,6 +28,7 @@ struct nodeleaf {
 
     count_t start_idx; // 32 bits
     count_t num_particles; // 32 bits
+    count_t next_sibling; // 32 bits
 
     ap_uint<1> is_leaf; // 1 bit
     ap_uint<1> is_last; // 1 bit
@@ -35,19 +36,5 @@ struct nodeleaf {
     // total is 256 bits, no need to pad to 256 bits
     // ap_uint<1> padding;
 } __attribute__((aligned(64)));
-
-// union nodeleaf {
-//     struct {
-//         phkey_t key;
-//         level_t level;
-//         pos_t pos[3];
-//         mass_t mass;
-//         count_t start_idx;
-//         count_t num_particles;
-//         ap_uint<1> is_leaf;
-//         ap_uint<1> is_last;
-//     };
-//     ap_uint<8> raw_data[64]; // Forces 512-bit (64-byte) size
-// };
 
 #endif

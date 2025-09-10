@@ -60,6 +60,7 @@ INIT_STACK:
   for (int i = 0; i < MAX_DEPTH; i++) {
 #pragma HLS UNROLL
     nodeleaf new_node = generate_empty_node(p.key >> (3 * (MAX_DEPTH - (i + 1))), i + 1);
+    new_node.next_sibling = -1;
     active_stack[i] = add_particle_to_node(new_node, p, true);
   }
 
@@ -71,6 +72,7 @@ PROCESS_PARTICLES:
     bool quiet_mode = false;
     result_stack_num_nodes = 0;
 
+    int level_divergence = 0;
   PROCESS_LEVELS:
     for (int level = 1; level <= MAX_DEPTH; level++) {
 #pragma HLS UNROLL
@@ -81,7 +83,10 @@ PROCESS_PARTICLES:
         active_stack[level - 1] =
             add_particle_to_node(active_stack[level - 1], p, false);
       } else {
-        flush_mode = true;
+        if(!flush_mode) {
+          level_divergence = level;
+          flush_mode = true;
+        }
 
         if (!quiet_mode) {
           result_stack[result_stack_num_nodes] = active_stack[level - 1];
@@ -97,9 +102,21 @@ PROCESS_PARTICLES:
       }
     }
 
+    // Update next sibling tracker for nodes above the divergence level
+    for (int j=1; j<MAX_DEPTH; j++) {
+      #pragma HLS UNROLL
+      if(active_stack[j-1].next_sibling != -1u && j < level_divergence) {
+        active_stack[j-1].next_sibling = active_stack[j-1].next_sibling + result_stack_num_nodes;
+      }
+    }
+
     // Write result nodes to stream one at a time
     for (int j = 0; j < result_stack_num_nodes; j++) {
-      node_stream.write(result_stack[result_stack_num_nodes - j - 1]);
+      int idx = result_stack_num_nodes - j - 1;
+      if(result_stack[idx].next_sibling != -1u) {
+        result_stack[idx].next_sibling += result_stack_num_nodes - idx;
+      }
+      node_stream.write(result_stack[idx]);
     }
   }
 
@@ -120,7 +137,11 @@ PROCESS_PARTICLES:
   }
 
   for (int j = 0; j < result_stack_num_nodes; j++) {
-    node_stream.write(result_stack[result_stack_num_nodes - j - 1]);
+    int index = result_stack_num_nodes - j - 1;
+    if(result_stack[index].next_sibling != -1u) {
+      result_stack[index].next_sibling += result_stack_num_nodes - index;
+    }
+    node_stream.write(result_stack[index]);
   }
 }
 
@@ -141,9 +162,9 @@ void node_writer(hls::stream<nodeleaf> &node_stream,
 
     // Mark the node as a leaf if it has less than NLEAF particles
     node.is_leaf = (node.num_particles <= NLEAF) || node.level == MAX_DEPTH;
-#ifndef __SYNTHESIS__
-    std::cout << "Node " << idx << " is_leaf: " << node.is_leaf << std::endl;
-#endif
+// #ifndef __SYNTHESIS__
+    // std::cout << "Node " << idx << " is_leaf: " << node.is_leaf << std::endl;
+// #endif
     // Reinterpret nodeleaf as ap_uint<512> for efficient AXI write
     ap_uint<512> node_bits;
     node_bits = *reinterpret_cast<ap_uint<512>*>(&node);

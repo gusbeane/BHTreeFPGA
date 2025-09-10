@@ -4,13 +4,14 @@
 #include <algorithm>
 #include <cmath>
 #include <array>
+#include <random>
 
 // Include HLS headers
 #include "treecon_config_hls.h"
 #include "treecon_types_hls.h"
 #include "peano_hilbert.h"
 
-const int TREE_DEPTH = 1024;
+const int TREE_DEPTH = 2048;
 const int PARTICLE_DEPTH = 1024;
 
 // Forward declaration of HLS kernel
@@ -382,6 +383,102 @@ bool test_at_max_depth() {
     return test_passed;
 }
 
+bool test_random_particles() {
+    std::cout << "\n=== Test: Random Particles ===" << std::endl;
+    bool test_passed = true;
+
+    const int NUM_PARTICLES = 1000;
+    
+    // Create random number generator with fixed seed for reproducibility
+    std::mt19937 gen(42);
+    std::uniform_real_distribution<float> pos_dis(0.0f, 1.0f);
+    
+    // Create particles array and fill with random positions
+    std::vector<particle_t> particles(NUM_PARTICLES);
+    for (int i = 0; i < NUM_PARTICLES; i++) {
+        particles[i].pos[0] = pos_dis(gen);
+        particles[i].pos[1] = pos_dis(gen);
+        particles[i].pos[2] = pos_dis(gen);
+        particles[i].mass = 1.0f / NUM_PARTICLES;
+        particles[i].idx = i;
+        
+        // Compute and store PH key
+        particles[i].key = simple_peano_hilbert_key(particles[i].pos[0], 
+                                                   particles[i].pos[1], 
+                                                   particles[i].pos[2]);
+    }
+    
+    // Sort particles by PH key
+    std::sort(particles.begin(), particles.end(), 
+              [](const particle_t& a, const particle_t& b) {
+                  return a.key < b.key;
+              });
+
+    // Print first 10 particles
+    std::cout << "First 10 particles:" << std::endl;
+    for (int i = 0; i < 10; i++) {
+        print_particle(particles[i], i);
+    }
+    std::cout << std::endl;
+    
+    // Construct tree with kernel
+    std::vector<ap_uint<512>> tree_output(TREE_DEPTH);
+    create_bhtree_kernel(particles.data(), tree_output.data(), NUM_PARTICLES);
+    
+    int num_nodes = 0;
+    for (int i = 0; i < tree_output.size(); i++) {
+        nodeleaf node = convert_output_node(tree_output[i]);
+        num_nodes++;
+        if (node.is_last) break;
+    }
+
+    // Reverse tree output
+    std::reverse(tree_output.begin(), tree_output.begin() + num_nodes);
+
+    // Print first 10 nodes
+    std::cout << "First 10 nodes:" << std::endl;
+    for (int i = 0; i < 10; i++) {
+        nodeleaf node = convert_output_node(tree_output[i]);
+        print_node(node, i);
+    }
+    std::cout << std::endl;
+
+    // return false;
+
+    // Check that the next sibling pointers are correct
+    std::cout << "\nChecking next sibling pointers..." << std::endl;
+    int next_sibling = 0;
+    bool sibling_test_passed = true;
+    for (int i = 0; i < num_nodes; i++) {
+        nodeleaf node = convert_output_node(tree_output[i]);
+        if(node.level > 1) continue;
+
+        // check that the next sibling is correct
+        sibling_test_passed &= (next_sibling == i);
+        if(next_sibling == i) {
+            std::cout << "Node " << i << " next sibling is correct, level=" << node.level << std::endl;
+        } else {
+            std::cout << "Node " << i << " next sibling is incorrect, expected=" << next_sibling << ", level=" << node.level << std::endl;
+        }
+
+        // print_node(node, i);
+
+        if(node.next_sibling != -1u) {
+            next_sibling = i + node.next_sibling;
+        }
+        else {
+            next_sibling = -1u;
+        }
+    }
+
+    std::cout << "Last next sibling = " << next_sibling << std::endl;
+    sibling_test_passed &= (next_sibling == -1u);
+
+    test_passed &= sibling_test_passed;
+
+    return test_passed;
+}
+
 int main() {
     std::cout << "=== HLS BHTree Manual Testbench ===" << std::endl;
     std::cout << "MAX_DEPTH = " << MAX_DEPTH << std::endl;
@@ -393,6 +490,8 @@ int main() {
     test_passed &= test_simple_manual_particles();
 
     test_passed &= test_at_max_depth();
+
+    test_passed &= test_random_particles();
     
     // Summary
     std::cout << "\n=== Test Summary ===" << std::endl;
