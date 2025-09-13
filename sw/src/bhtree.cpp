@@ -62,6 +62,7 @@ void print_node(const NodeOrLeaf& node, int index) {
               << "Level: " << node.level 
               << " Key: " << format_ph_key_padded(node.key, node.level) 
               << " Npart: " << std::left << std::setw(3) << node.Nparticles 
+              << " Leaf: " << node.is_leaf
               << " StartIdx: " << node.start_idx
               << " COM: (" << std::fixed << std::setprecision(3) 
               << node.com_x << ", " << node.com_y << ", " << node.com_z << ")"
@@ -107,6 +108,9 @@ std::vector<NodeOrLeaf> add_particle_to_tree(Tree& temp_nodes, RealPosition3D po
             if (!quiet_mode) {
                 new_nodes.push_back(temp_nodes[i-1]);
                 num_nodes_emitted++;
+                if(temp_nodes[i-1].Nparticles <= NLEAF) {
+                    quiet_mode = true;
+                }
             }
 
             temp_nodes[i-1] = NodeOrLeaf{};
@@ -115,10 +119,6 @@ std::vector<NodeOrLeaf> add_particle_to_tree(Tree& temp_nodes, RealPosition3D po
             temp_nodes[i-1].start_idx = index;
             temp_nodes[i-1].next_sibling = 0;
             add_particle_to_node(temp_nodes[i-1], pos, mass);
-
-            if (temp_nodes[i-1].Nparticles <= NLEAF) {
-                quiet_mode = true;
-            }
         }
     }
 
@@ -134,6 +134,9 @@ std::vector<NodeOrLeaf> add_particle_to_tree(Tree& temp_nodes, RealPosition3D po
         // if the next sibling is -1, we want to keep it as -1 (n.b. -1 is max value for unsigned int)
         if(new_nodes[i].next_sibling != -1u) {
             new_nodes[i].next_sibling += num_nodes_emitted - i;
+        }
+        if(new_nodes[i].Nparticles <= NLEAF) {
+            new_nodes[i].is_leaf = true;
         }
     }
 
@@ -158,6 +161,9 @@ std::vector<NodeOrLeaf> flush_out_nodes(Tree& temp_nodes) {
     for (unsigned int i=0; i<num_nodes_emitted; i++) {
         if(new_nodes[i].next_sibling != -1u) {
             new_nodes[i].next_sibling += num_nodes_emitted - i;
+        }
+        if(new_nodes[i].Nparticles <= NLEAF) {
+            new_nodes[i].is_leaf = true;
         }
     }
 
@@ -210,8 +216,14 @@ Tree build_tree(PointCloud pc) {
     return tree;
 }
 
-void walk_tree(Tree& tree, long num_nodes, RealPosition3D pos, double G, double theta) {
-    int current_idx = 0;
+void walk_tree(Tree& tree, unsigned long num_nodes, RealPosition3D pos,
+        double G, double theta, RealPosition3D& acc, int& Nint_node, int& Nint_leaf) {
+    // Initialize output parameters
+    acc = {0.0, 0.0, 0.0};
+    Nint_node = 0;
+    Nint_leaf = 0;
+    
+    unsigned long current_idx = 0;
 
     while(current_idx < num_nodes) {
         NodeOrLeaf node = tree[current_idx];
@@ -223,9 +235,56 @@ void walk_tree(Tree& tree, long num_nodes, RealPosition3D pos, double G, double 
         double rsq = dx*dx + dy*dy + dz*dz;
         double r = std::sqrt(rsq);
         
-        // check multipole acceptance criterion
+        // check multipole acceptance criterion. size of node is 1/(2^level)
+        double node_size = 1.0 / (1 << node.level);
+        if(r > node_size/theta || node.is_leaf) {
+            double rcubed = rsq*r;
+            // we are not opening this node, just use its com to compute acc
+            acc[0] += G * node.mass * (dx) / (rcubed);
+            acc[1] += G * node.mass * (dy) / (rcubed);
+            acc[2] += G * node.mass * (dz) / (rcubed);
+            
+            if(node.is_leaf) {
+                Nint_leaf += 1;
+            }
+            else {
+                Nint_node += 1;
+            }
 
-        
+            // because we didn't open the node, we can skip to the next sibling
+            if(node.next_sibling != -1u) {
+                current_idx += node.next_sibling;
+            }
+            else {
+                break;
+            }
+        }
+        else {
+            // we are opening this node, so we just advance to the next nodeleaf
+            current_idx++;
+        }
+    }
+}
+
+void direct_sum(PointCloud pc, RealPosition3D pos, double G, RealPosition3D& acc, int &Nint) {
+    // zero out acc
+    acc = {0.0, 0.0, 0.0};
+    Nint = 0;
+    
+    for(int i = 0; i < pc.size(); i++) {
+        RealPosition3D dx = pc.get_real_positions()[i];
+        dx[0] -= pos[0];
+        dx[1] -= pos[1];
+        dx[2] -= pos[2];
+        double rsq = dx[0]*dx[0] + dx[1]*dx[1] + dx[2]*dx[2];
+        double r = std::sqrt(rsq);
+        double rcubed = rsq*r;
+        if(r > 0.0) {
+            acc[0] += G * pc.get_masses()[i] * (dx[0]) / (rcubed);
+            acc[1] += G * pc.get_masses()[i] * (dx[1]) / (rcubed);
+            acc[2] += G * pc.get_masses()[i] * (dx[2]) / (rcubed);
+        }
+        Nint += 1;
     }
 }
 
@@ -415,8 +474,36 @@ int main(int argc, char* argv[]) {
     std::cout << "Difference: (" << com[0] - tree[0].com_x << ", " << com[1] - tree[0].com_y << ", " << com[2] - tree[0].com_z << ")" << std::endl;
     std::cout << std::endl;
 
+    // Check total number of leaves
+    int num_leaves = 0;
+    for (int i = 0; i < tree.size(); i++) {
+        if (tree[i].is_leaf) {
+            num_leaves++;
+        }
+    }
+    std::cout << "Total number of leaves: " << num_leaves << std::endl;
 
-    test_at_max_depth();
+
+    // test_at_max_depth();
+
+
+    // now we calculate some numbers
+    double G = 1.0;
+    RealPosition3D acc_direct;
+    int Nint_direct;
+    RealPosition3D pos = {0.8, 0.5, 0.5};
+    direct_sum(pc, pos, G, acc_direct, Nint_direct);
+    std::cout << "Direct sum: (" << acc_direct[0] << ", " << acc_direct[1] << ", " << acc_direct[2] << ")" << std::endl;
+    std::cout << "Nint_direct: " << Nint_direct << std::endl;
+
+    // now do tree walk
+    RealPosition3D acc_tree;
+    int Nint_node, Nint_leaf;
+    double theta = 0.5;
+    walk_tree(tree, tree.size(), pos, G, theta, acc_tree, Nint_node, Nint_leaf);
+    std::cout << "Tree walk: (" << acc_tree[0] << ", " << acc_tree[1] << ", " << acc_tree[2] << ")" << std::endl;
+    std::cout << "Nint_node: " << Nint_node << std::endl;
+    std::cout << "Nint_leaf: " << Nint_leaf << std::endl;
 
     return 0;
 } 
