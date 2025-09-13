@@ -13,10 +13,13 @@ const unsigned int NODE_WRITE_BURST_SIZE = 16;
 
 struct particle_t {
     pos_t pos[3];
+    acc_t acc[3];
     mass_t mass;
     count_t idx;
     phkey_t key;
-};
+    count_t next_cell;
+    bool valid;
+} __attribute__((aligned(64))); // padded to 64 bytes
 
 struct nodeleaf {
     phkey_t key; // 30 bits
@@ -33,8 +36,11 @@ struct nodeleaf {
     ap_uint<1> is_leaf; // 1 bit
     ap_uint<1> is_last; // 1 bit
 
+    count_t target_cell; // 32 bits
+    bool valid; // 1 bit
+
     // total is 256 bits, no need to pad to 256 bits
     // ap_uint<1> padding;
-} __attribute__((aligned(64)));
+} __attribute__((aligned(64))); // padded to 64 bytes
 
 #endif

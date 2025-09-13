@@ -61,7 +61,8 @@ void print_node(const nodeleaf& node, int index) {
               << "pos=(" << double(node.pos[0]) << "," << double(node.pos[1]) << "," << double(node.pos[2]) << ") "
               << "mass=" << double(node.mass) << " "
               << "leaf=" << (node.is_leaf ? "true" : "false") << " "
-              << "last=" << (node.is_last ? "true" : "false") << std::endl;
+              << "last=" << (node.is_last ? "true" : "false") << " "
+              << "next_sibling=" << int(node.next_sibling) << std::endl;
 }
 
 // Simple function to compute Peano-Hilbert key (simplified 3D version)
@@ -483,6 +484,15 @@ bool test_random_particles() {
     sibling_test_passed &= (next_sibling == -1u);
 
     test_passed &= sibling_test_passed;
+
+    // check sibling of a max depth node
+    for(int i = 0; i < num_nodes; i++) {
+        nodeleaf node = convert_output_node(tree_output[i]);
+        if(node.level == MAX_DEPTH) {
+            print_node(node, i);
+            break;
+        }
+    }
 
     return test_passed;
 }
