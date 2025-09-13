@@ -19,9 +19,9 @@ template <int cell_index>
 void cell(pos_t theta, double G, hls::stream<nodepart_packet> &data_in,
           hls::stream<nodepart_packet> &data_out) {
 
-  //   const pos_t node_sizes[MAX_DEPTH] = {
-  //   0.5,      0.25,      0.125,      0.0625,      0.03125,
-  //   0.015625, 0.0078125, 0.00390625, 0.001953125, 0.0009765625};
+   static const pos_t node_sizes[MAX_DEPTH] = {
+    0.5,      0.25,      0.125,      0.0625,      0.03125,
+    0.015625, 0.0078125, 0.00390625, 0.001953125, 0.0009765625};
 
   static nodeleaf local_node;
   static pos_t local_node_size_theta_sq;
@@ -88,9 +88,8 @@ void cell(pos_t theta, double G, hls::stream<nodepart_packet> &data_in,
     nodeleaf node = *reinterpret_cast<nodeleaf *>(&pkt.nodeleaf_or_particle);
     if (node.target_cell == cell_index) {
       local_node = node;
-      //   local_node_size_theta_sq = node_sizes[node.level - 1] *
-      //  node_sizes[node.level - 1] / (theta * theta);
-      local_node_size_theta_sq = pos_t(1.0) / (theta * theta);
+        local_node_size_theta_sq = node_sizes[node.level - 1] *
+       node_sizes[node.level - 1] / (theta * theta);
       has_node = 1;
     } else if (node.target_cell > cell_index) {
       data_out.write(pkt);
