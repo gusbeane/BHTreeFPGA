@@ -18,6 +18,7 @@ struct nodepart_packet {
 template <int cell_index>
 void cell(pos_t theta, double G, hls::stream<nodepart_packet> &data_in,
           hls::stream<nodepart_packet> &data_out) {
+#pragma HLS PIPELINE II=1
 
    static const pos_t node_sizes[MAX_DEPTH] = {
     0.5,      0.25,      0.125,      0.0625,      0.03125,
