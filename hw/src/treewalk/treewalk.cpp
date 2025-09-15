@@ -1,6 +1,6 @@
 #include "hls_math.h"
-#include "treecon_config_hls.h"
-#include "treecon_types_hls.h"
+#include "tree_config.h"
+#include "tree_types.h"
 #include <cmath>
 #include <cstring>
 
@@ -95,7 +95,7 @@ void read_kernel(hls::stream<particle_t> &part_toread, hls::stream<nodepart_pack
 
 void treewalk_kernel(hls::stream<particle_t> &particle_in,
                      particle_t *particle_out, nodeleaf *tree,
-                     pos_t theta, double G) {
+                     pos_t theta) {
 
 #pragma HLS DATAFLOW
 

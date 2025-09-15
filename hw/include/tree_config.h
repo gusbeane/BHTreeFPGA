@@ -1,7 +1,7 @@
 #ifndef TREECON_CONFIG_HLS_H
 #define TREECON_CONFIG_HLS_H
 
-#include "treecon_types_hls.h"
+#include "tree_types.h"
 #include "hls_stream.h"
 
 const unsigned int MAX_DEPTH = 10;

@@ -1,5 +1,5 @@
-#include "treecon_config_hls.h"
-#include "treecon_types_hls.h"
+#include "tree_config.h"
+#include "tree_types.h"
 
 int main() {
     return 0;
