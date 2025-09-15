@@ -7,21 +7,35 @@
 #include <random>
 
 // Include HLS headers
-#include "tree_config.h"
-#include "tree_types.h"
 #include "peano_hilbert.h"
+#include "treecon.h"
 
 const int TREE_DEPTH = 2048;
 const int PARTICLE_DEPTH = 1024;
 
-// Forward declaration of HLS kernel
-void create_bhtree_kernel(const particle_t *particles,
-                          ap_uint<512> *tree,
-                          count_t num_particles);
-
 // Test particle structure
+// Note: Using accessor methods for xint/yint/zint is efficient for small test code and CPU-side logic.
+// For large arrays of this struct, especially in performance-critical or hardware contexts, 
+// prefer to precompute and store xint/yint/zint in advance to avoid repeated computation and 
+// potential cache/memory overhead from method calls and mutable state.
+
 struct TestParticle {
     double x, y, z, mass;
+    unsigned int ph_key;
+
+    // Accessors to compute integer coordinates on demand
+    unsigned int xint() const {
+        constexpr unsigned int max_uint = std::numeric_limits<unsigned int>::max();
+        return static_cast<unsigned int>(x * max_uint);
+    }
+    unsigned int yint() const {
+        constexpr unsigned int max_uint = std::numeric_limits<unsigned int>::max();
+        return static_cast<unsigned int>(y * max_uint);
+    }
+    unsigned int zint() const {
+        constexpr unsigned int max_uint = std::numeric_limits<unsigned int>::max();
+        return static_cast<unsigned int>(z * max_uint);
+    }
 };
 
 // Helper function to create a test particle
@@ -63,26 +77,6 @@ void print_node(const nodeleaf& node, int index) {
               << "leaf=" << (node.is_leaf ? "true" : "false") << " "
               << "last=" << (node.is_last ? "true" : "false") << " "
               << "next_sibling=" << int(node.next_sibling) << std::endl;
-}
-
-// Simple function to compute Peano-Hilbert key (simplified 3D version)
-uint32_t simple_peano_hilbert_key(double x, double y, double z, int depth = 10) {
-    // Convert to integer coordinates (0 to 2^depth - 1)
-    uint32_t max_coord = (1U << depth) - 1;
-    uint32_t ix = (uint32_t)(x * max_coord);
-    uint32_t iy = (uint32_t)(y * max_coord);
-    uint32_t iz = (uint32_t)(z * max_coord);
-    
-    // Very simplified PH key - just interleave bits for now
-    // This is not a true Peano-Hilbert curve but will work for basic testing
-    uint32_t key = 0;
-    for (int i = 0; i < depth; i++) {
-        uint32_t bit_x = (ix >> i) & 1;
-        uint32_t bit_y = (iy >> i) & 1;
-        uint32_t bit_z = (iz >> i) & 1;
-        key |= (bit_x << (3*i)) | (bit_y << (3*i + 1)) | (bit_z << (3*i + 2));
-    }
-    return key;
 }
 
 bool test_peano_hilbert_key() {
@@ -151,12 +145,12 @@ bool test_simple_manual_particles() {
     };
     
     // Compute PH keys and create sorted list
+    PeanoHilbert ph(10);
     std::vector<std::pair<uint32_t, int>> key_index_pairs;
     for (int i = 0; i < NUM_PARTICLES; i++) {
-        uint32_t ph_key = simple_peano_hilbert_key(test_particles[i].x, 
-                                                   test_particles[i].y, 
-                                                   test_particles[i].z);
-        key_index_pairs.push_back({ph_key, i});
+      uint32_t ph_key = ph.generate_key(
+          test_particles[i].xint(), test_particles[i].yint(), test_particles[i].zint());
+      key_index_pairs.push_back({ph_key, i});
     }
     
     // Sort by PH key
@@ -234,10 +228,12 @@ bool test_simple_manual_particles() {
     // Now we loop over the nodes and check that their center of mass matches
     // the position of their respective particle
     for (int i = 0; i < num_nodes; i++) {
+    int idx_map[] = {0, 2, 1, 3};
+    int part_idx = idx_map[i];
       nodeleaf node = convert_output_node(tree_output[i]);
-      if (abs(double(node.pos[0]) - test_particles[i].x) > 0.01 ||
-          abs(double(node.pos[1]) - test_particles[i].y) > 0.01 ||
-          abs(double(node.pos[2]) - test_particles[i].z) > 0.01) {
+      if (abs(double(node.pos[0]) - test_particles[part_idx].x) > 0.01 ||
+          abs(double(node.pos[1]) - test_particles[part_idx].y) > 0.01 ||
+          abs(double(node.pos[2]) - test_particles[part_idx].z) > 0.01) {
         std::cout << "ERROR: Node " << i
                   << " center of mass does not match particle position!"
                   << std::endl;
@@ -264,11 +260,12 @@ bool test_at_max_depth() {
     }
     
     // Compute PH keys and create sorted list
+    PeanoHilbert ph(10);
     std::vector<std::pair<uint32_t, int>> key_index_pairs;
     for (int i = 0; i < NUM_PARTICLES; i++) {
-        uint32_t ph_key = simple_peano_hilbert_key(test_particles[i].x, 
-                                                   test_particles[i].y, 
-                                                   test_particles[i].z);
+        uint32_t ph_key = ph.generate_key(test_particles[i].xint(), 
+                                                   test_particles[i].yint(), 
+                                                   test_particles[i].zint());
         key_index_pairs.push_back({ph_key, i});
     }
     
@@ -400,6 +397,7 @@ bool test_random_particles() {
     std::uniform_real_distribution<float> pos_dis(0.0f, 1.0f);
     
     // Create particles array and fill with random positions
+    PeanoHilbert ph(10);
     std::vector<particle_t> particles(NUM_PARTICLES);
     for (int i = 0; i < NUM_PARTICLES; i++) {
         particles[i].pos[0] = pos_dis(gen);
@@ -409,7 +407,7 @@ bool test_random_particles() {
         particles[i].idx = i;
         
         // Compute and store PH key
-        particles[i].key = simple_peano_hilbert_key(particles[i].pos[0], 
+        particles[i].key = ph.generate_key(particles[i].pos[0], 
                                                    particles[i].pos[1], 
                                                    particles[i].pos[2]);
     }
