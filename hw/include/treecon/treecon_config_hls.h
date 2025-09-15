@@ -17,7 +17,7 @@ struct particle_t {
     mass_t mass;
     count_t idx;
     phkey_t key;
-    count_t next_cell;
+    count_t next_tree_idx;
     bool valid;
 } __attribute__((aligned(64))); // padded to 64 bytes
 
