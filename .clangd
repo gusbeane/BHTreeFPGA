@@ -1,9 +1,8 @@
 CompileFlags:
   Add:
     - "-I/opt/xilinx/2025.1/Vitis/include"
-    - "-I/home/abeane/Projects/BHTreeFPGA/hw/include/treecon"
-    - "-I/home/abeane/Projects/BHTreeFPGA/hw/include/common"
     - "-I/home/abeane/Projects/BHTreeFPGA/hw/include"
+    - "-I/home/abeane/Projects/BHTreeFPGA/hw/tb/common"
     - "-I/usr/include/c++/11"
     - "-I/usr/include/x86_64-linux-gnu/c++/11"
     - "-I/usr/include/c++/11/backward"
