@@ -19,3 +19,5 @@ CompileFlags:
     - "-fhlstoplevel=*"
     - "--gcc-toolchain=*"
   Compiler: /usr/bin/g++
+Diagnostics:
+  Suppress: misc-definitions-in-headers

@@ -40,6 +40,7 @@ nodeleaf generate_empty_node(phkey_t node_key, level_t level) {
   node.start_idx = 0;
   node.is_leaf = true;
   node.is_last = false;
+  node.next_sibling = 0;
 
   return node;
 }

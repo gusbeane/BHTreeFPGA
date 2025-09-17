@@ -10,75 +10,11 @@
 #include "peano_hilbert.h"
 #include "treecon.h"
 #include "test_peano_hilbert.h"
+#include "test_util.h"
+#include "tree_gen.h"
 
 const int TREE_DEPTH = 2048;
 const int PARTICLE_DEPTH = 1024;
-
-// Test particle structure
-// Note: Using accessor methods for xint/yint/zint is efficient for small test code and CPU-side logic.
-// For large arrays of this struct, especially in performance-critical or hardware contexts, 
-// prefer to precompute and store xint/yint/zint in advance to avoid repeated computation and 
-// potential cache/memory overhead from method calls and mutable state.
-
-struct TestParticle {
-    double x, y, z, mass;
-    unsigned int ph_key;
-
-    // Accessors to compute integer coordinates on demand
-    unsigned int xint() const {
-        constexpr unsigned int max_uint = std::numeric_limits<unsigned int>::max();
-        return static_cast<unsigned int>(x * max_uint);
-    }
-    unsigned int yint() const {
-        constexpr unsigned int max_uint = std::numeric_limits<unsigned int>::max();
-        return static_cast<unsigned int>(y * max_uint);
-    }
-    unsigned int zint() const {
-        constexpr unsigned int max_uint = std::numeric_limits<unsigned int>::max();
-        return static_cast<unsigned int>(z * max_uint);
-    }
-};
-
-// Helper function to create a test particle
-particle_t create_test_particle(double x, double y, double z, double mass, 
-                                uint32_t ph_key, int index) {
-    particle_t p;
-    p.pos[0] = pos_t(x);
-    p.pos[1] = pos_t(y); 
-    p.pos[2] = pos_t(z);
-    p.mass = mass_t(mass);
-    p.idx = count_t(index);
-    p.key = phkey_t(ph_key & 0x3FFFFFFF); // Mask to 30 bits for phkey_t
-    return p;
-}
-
-// Helper function to convert ap_uint<512> back to nodeleaf for analysis
-nodeleaf convert_output_node(const ap_uint<512>& node_bits) {
-    return *reinterpret_cast<const nodeleaf*>(&node_bits);
-}
-
-// Helper function to print a particle for debugging
-void print_particle(const particle_t& p, int index) {
-    std::cout << "Particle " << index << ": "
-              << "pos=(" << double(p.pos[0]) << "," << double(p.pos[1]) << "," << double(p.pos[2]) << ") "
-              << "mass=" << double(p.mass) << " "
-              << "key=0x" << std::hex << int(p.key) << std::dec << " "
-              << "idx=" << int(p.idx) << std::endl;
-}
-
-// Helper function to print a node for debugging  
-void print_node(const nodeleaf& node, int index) {
-    std::cout << "Node " << index << ": "
-              << "level=" << int(node.level) << " "
-              << "key=0x" << std::hex << int(node.key) << std::dec << " "
-              << "npart=" << int(node.num_particles) << " "
-              << "start_idx=" << int(node.start_idx) << " "
-              << "pos=(" << double(node.pos[0]) << "," << double(node.pos[1]) << "," << double(node.pos[2]) << ") "
-              << "mass=" << double(node.mass) << " "
-              << "leaf=" << (node.is_leaf ? "true" : "false") << " "
-              << "last=" << (node.is_last ? "true" : "false") << " "
-              << "next_sibling=" << int(node.next_sibling) << std::endl;
-}
 
 // Test with manually created particles 
 bool test_simple_manual_particles() {
@@ -337,45 +273,16 @@ bool test_at_max_depth() {
     return test_passed;
 }
 
-bool test_random_particles() {
+bool test_random_particles(bool verbose) {
     std::cout << "\n=== Test: Random Particles ===" << std::endl;
     bool test_passed = true;
 
     const int NUM_PARTICLES = 1000;
     
-    // Create random number generator with fixed seed for reproducibility
-    std::mt19937 gen(42);
-    std::uniform_real_distribution<float> pos_dis(0.0f, 1.0f);
-    
-    // Create particles array and fill with random positions
-    PeanoHilbert ph(10);
-    std::vector<particle_t> particles(NUM_PARTICLES);
-    for (int i = 0; i < NUM_PARTICLES; i++) {
-        particles[i].pos[0] = pos_dis(gen);
-        particles[i].pos[1] = pos_dis(gen);
-        particles[i].pos[2] = pos_dis(gen);
-        particles[i].mass = 1.0f / NUM_PARTICLES;
-        particles[i].idx = i;
-        
-        // Compute and store PH key
-        particles[i].key = ph.generate_key(particles[i].pos[0], 
-                                                   particles[i].pos[1], 
-                                                   particles[i].pos[2]);
-    }
-    
-    // Sort particles by PH key
-    std::sort(particles.begin(), particles.end(), 
-              [](const particle_t& a, const particle_t& b) {
-                  return a.key < b.key;
-              });
+    auto result = generate_random_tree(NUM_PARTICLES, MAX_DEPTH, verbose);
+    std::vector<nodeleaf> tree = result.tree;
+    std::vector<particle_t> particles = result.particles;
 
-    // Print first 10 particles
-    std::cout << "First 10 particles:" << std::endl;
-    for (int i = 0; i < 10; i++) {
-        print_particle(particles[i], i);
-    }
-    std::cout << std::endl;
-    
     // Construct tree with kernel
     std::vector<ap_uint<512>> tree_output(TREE_DEPTH);
     create_bhtree_kernel(particles.data(), tree_output.data(), NUM_PARTICLES);
@@ -387,24 +294,30 @@ bool test_random_particles() {
         if (node.is_last) break;
     }
 
-    std::cout << "Number of particles: " << NUM_PARTICLES << std::endl;
-    std::cout << "Number of nodes: " << num_nodes << std::endl;
+    if (verbose) {
+      std::cout << "Number of particles: " << NUM_PARTICLES << std::endl;
+      std::cout << "Number of nodes: " << num_nodes << std::endl;
+    }
 
     // Reverse tree output
     std::reverse(tree_output.begin(), tree_output.begin() + num_nodes);
 
     // Print first 10 nodes
-    std::cout << "First 10 nodes:" << std::endl;
-    for (int i = 0; i < 10; i++) {
+    if (verbose) {
+      std::cout << "First 10 nodes:" << std::endl;
+      for (int i = 0; i < 10; i++) {
         nodeleaf node = convert_output_node(tree_output[i]);
         print_node(node, i);
+      }
+      std::cout << std::endl;
     }
-    std::cout << std::endl;
 
     // return false;
 
     // Check that the next sibling pointers are correct
-    std::cout << "\nChecking next sibling pointers..." << std::endl;
+    if (verbose) {
+        std::cout << "\nChecking next sibling pointers..." << std::endl;
+    }
     int next_sibling = 0;
     bool sibling_test_passed = true;
     for (int i = 0; i < num_nodes; i++) {
@@ -413,13 +326,18 @@ bool test_random_particles() {
 
         // check that the next sibling is correct
         sibling_test_passed &= (next_sibling == i);
-        if(next_sibling == i) {
-            std::cout << "Node " << i << " next sibling is correct, level=" << node.level << std::endl;
-        } else {
-            std::cout << "Node " << i << " next sibling is incorrect, expected=" << next_sibling << ", level=" << node.level << std::endl;
+        if (verbose) {
+          if (next_sibling == i) {
+            std::cout << "Node " << i
+                      << " next sibling is correct, level=" << node.level
+                      << std::endl;
+          } else {
+            std::cout << "Node " << i
+                      << " next sibling is incorrect, expected=" << next_sibling
+                      << ", level=" << node.level << std::endl;
+            print_node(node, i);
+          }
         }
-
-        // print_node(node, i);
 
         if(node.next_sibling != -1u) {
             next_sibling = i + node.next_sibling;
@@ -428,20 +346,32 @@ bool test_random_particles() {
             next_sibling = -1u;
         }
     }
+    if (verbose) {
+      std::cout << "Last next sibling = " << next_sibling << std::endl;
+    }
 
-    std::cout << "Last next sibling = " << next_sibling << std::endl;
     sibling_test_passed &= (next_sibling == -1u);
-
     test_passed &= sibling_test_passed;
 
     // check sibling of a max depth node
+    bool max_depth_node_test_passed = true;
     for(int i = 0; i < num_nodes; i++) {
         nodeleaf node = convert_output_node(tree_output[i]);
         if(node.level == MAX_DEPTH) {
-            print_node(node, i);
-            break;
+            if(node.next_sibling != 1 && node.next_sibling != -1u) {
+                max_depth_node_test_passed = false;
+                if (verbose) {
+                    std::cout << "Node " << i
+                              << " next sibling is incorrect, expected=1 or -1u, got " << node.next_sibling << std::endl;
+                    print_node(node, i);
+                }
+            }
         }
     }
+
+    test_passed &= max_depth_node_test_passed;
+
+    std::cout << "Random particles test " << (test_passed ? "✅ PASSED" : "❌ FAILED") << std::endl;
 
     return test_passed;
 }
@@ -456,8 +386,12 @@ int main() {
     test0 = test_peano_hilbert_key();
     test1 = test_simple_manual_particles();
     test2 = test_at_max_depth();
-    test3 = test_random_particles();
+    test3 = test_random_particles(false);
     test_passed = test0 && test1 && test2 && test3;
+
+    if(!test3) {
+        test_random_particles(true);
+    }
 
     if(!test0) {
         std::cout << "❌ Test peano hilbert key FAILED!" << std::endl;
