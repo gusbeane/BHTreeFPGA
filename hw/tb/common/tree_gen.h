@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <iostream>
 #include <vector>
+#include <cmath>
 
 struct TreeAndParticles {
     std::vector<nodeleaf> tree;
@@ -19,7 +20,7 @@ struct TreeAndParticles {
 std::vector<nodeleaf> treecon_wrapper(std::vector<particle_t> particles,
                                       int NUM_PARTICLES, bool verbose) {
   // Construct tree with kernel
-  std::vector<ap_uint<512>> tree_raw(NUM_PARTICLES * 2);
+  std::vector<ap_uint<512>> tree_raw(NUM_PARTICLES * 3);
   create_bhtree_kernel(particles.data(), tree_raw.data(), NUM_PARTICLES);
 
   int num_nodes = 0;
@@ -97,6 +98,42 @@ TreeAndParticles generate_simple_tree(int max_depth, bool verbose) {
 
   if (verbose) {
     std::cout << "Created 4 particles for simple tree test" << std::endl;
+  }
+
+  // Sort particles by PH key
+  particles = phsort(particles, max_depth, verbose);
+
+  // Print first and last ph key
+  if (verbose) {
+    std::cout << "First ph key: " << particles[0].key << std::endl;
+    std::cout << "Last ph key: " << particles[particles.size() - 1].key << std::endl;
+  }
+
+  std::vector<nodeleaf> tree = treecon_wrapper(particles, NUM_PARTICLES, verbose);
+
+  return {tree, particles};
+}
+
+TreeAndParticles generate_max_depth_tree(int max_depth, bool verbose) {
+  // Create particles designed to test maximum depth behavior
+  const int NUM_PARTICLES = 10;
+
+  // Create particles array with positions that will trigger max depth
+  std::vector<particle_t> particles(NUM_PARTICLES);
+  
+  // Create particles with slightly different x coordinates but same y,z
+  // This creates a scenario that pushes the tree to maximum depth
+  double step = (1.0 / pow(2, max_depth));
+  for (int i = 0; i < NUM_PARTICLES; i++) {
+    particles[i].pos[0] = pos_t(0.1f + float(i * step / NUM_PARTICLES));
+    particles[i].pos[1] = pos_t(0.1f);
+    particles[i].pos[2] = pos_t(0.1f);
+    particles[i].mass = mass_t(1.0f / NUM_PARTICLES);
+    particles[i].idx = count_t(i);
+  }
+
+  if (verbose) {
+    std::cout << "Created 10 particles for max depth tree test" << std::endl;
   }
 
   // Sort particles by PH key

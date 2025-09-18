@@ -161,9 +161,7 @@ void node_writer(hls::stream<nodeleaf> &node_stream,
 
     // Mark the node as a leaf if it has less than NLEAF particles
     node.is_leaf = (node.num_particles <= NLEAF) || node.level == MAX_DEPTH;
-// #ifndef __SYNTHESIS__
-    // std::cout << "Node " << idx << " is_leaf: " << node.is_leaf << std::endl;
-// #endif
+
     // Reinterpret nodeleaf as ap_uint<512> for efficient AXI write
     ap_uint<512> node_bits;
     node_bits = *reinterpret_cast<ap_uint<512>*>(&node);

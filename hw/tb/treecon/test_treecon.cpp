@@ -73,139 +73,80 @@ bool test_simple_manual_particles(bool verbose) {
     return test_passed;
 }
 
-bool test_at_max_depth() {
+bool test_at_max_depth(bool verbose) {
     std::cout << "\n=== Test: At Max Depth ===" << std::endl;
+    
+    auto result = generate_max_depth_tree(MAX_DEPTH, verbose);
+    std::vector<nodeleaf> tree = result.tree;
+    std::vector<particle_t> particles = result.particles;
+    
 
-    const int NUM_PARTICLES = 10;
 
-    // Manually create particles at different octants
-    std::vector<TestParticle> test_particles(PARTICLE_DEPTH);
-    double step = (1.0 / pow(2, MAX_DEPTH));
-    for (int i = 0; i < NUM_PARTICLES; i++) {
-        test_particles[i] = {0.1 + i*step/NUM_PARTICLES, 0.1, 0.1, 1.0/double(NUM_PARTICLES)};
-    }
-    
-    // Compute PH keys and create sorted list
-    PeanoHilbert ph(10);
-    std::vector<std::pair<uint32_t, int>> key_index_pairs;
-    for (int i = 0; i < NUM_PARTICLES; i++) {
-        uint32_t ph_key = ph.generate_key(test_particles[i].xint(), 
-                                                   test_particles[i].yint(), 
-                                                   test_particles[i].zint());
-        key_index_pairs.push_back({ph_key, i});
-    }
-    
-    // Sort by PH key
-    std::sort(key_index_pairs.begin(), key_index_pairs.end());
-    
-    std::cout << "Manual particles sorted by PH keys:" << std::endl;
-    for (int i = 0; i < NUM_PARTICLES; i++) {
-        int orig_idx = key_index_pairs[i].second;
-        uint32_t key = key_index_pairs[i].first;
-        std::cout << "  Particle " << i << " (orig " << orig_idx << "): pos=(" 
-                  << test_particles[orig_idx].x << "," 
-                  << test_particles[orig_idx].y << "," 
-                  << test_particles[orig_idx].z 
-                  << ") key=0x" << std::hex << key << std::dec << std::endl;
-    }
-    
-    // Convert to HLS format and run kernel
-    particle_t particles[PARTICLE_DEPTH];
-    for (int i = 0; i < NUM_PARTICLES; i++) {
-        int orig_idx = key_index_pairs[i].second;
-        uint32_t key = key_index_pairs[i].first;
-        particle_t p = create_test_particle(test_particles[orig_idx].x,
-                                           test_particles[orig_idx].y,
-                                           test_particles[orig_idx].z,
-                                           test_particles[orig_idx].mass,
-                                           key, i);
-        particles[i] = p;
-        print_particle(p, i);
-    }
-    std::vector<ap_uint<512>> tree_output(TREE_DEPTH); // Small buffer for simple test
-    
-    std::cout << "\nRunning HLS kernel on manual particles..." << std::endl;
-    create_bhtree_kernel(particles, tree_output.data(), NUM_PARTICLES);
-
-    // Print output output
-    int num_nodes = 0;
-    std::cout << "\nOutput nodes:" << std::endl;
-    for (int i = 0; i < 50; i++) {
-        nodeleaf node = convert_output_node(tree_output[i]);
-        print_node(node, i);
-        num_nodes++;
-        if (node.is_last) break;
+    if (verbose) {
+        std::cout << "\nOutput nodes:" << std::endl;
+        for (int i = 0; i < std::min(50, (int)tree.size()); i++) {
+            print_node(tree[i], i);
+        }
     }
 
     // Now some sanity checks
     bool test_passed = true;
-    bool test_tmp;
+    bool test_tmp = true;
 
     // Number of nodes should be 19
-    test_tmp = (num_nodes == 19);
+    test_tmp = (tree.size() == 19);
     if(!test_tmp) {
-        std::cout << "ERROR: Number of nodes should be 19, got " << num_nodes << std::endl;
+        std::cout << "ERROR: Number of nodes should be 19, got " << tree.size() << std::endl;
     }
     test_passed &= test_tmp;
 
     // Sum of leaf node num_particles should be equal to NUM_PARTICLES
-    int num_particles = 0;
-    for (int i = 0; i < num_nodes; i++) {
-        nodeleaf node = convert_output_node(tree_output[i]);
-        if (node.is_leaf) num_particles += node.num_particles;
+    int num_particles_in_leaves = 0;
+    for (int i = 0; i < tree.size(); i++) {
+        nodeleaf node = tree[i];
+        if (node.is_leaf) num_particles_in_leaves += node.num_particles;
     }
-    test_tmp = (num_particles == NUM_PARTICLES);
+    test_tmp = (num_particles_in_leaves == particles.size());
     if(!test_tmp) {
-        std::cout << "ERROR: Number of particles in leaf nodes should be " << NUM_PARTICLES << ", got " << num_particles << std::endl;
+        std::cout << "ERROR: Number of particles in leaf nodes should be " << particles.size() << ", got " << num_particles_in_leaves << std::endl;
     }
     test_passed &= test_tmp;
 
-    // Check that node 2 through 10 have same pos and that their pos match total center of mass
-    // Compute center of mass
-    TestParticle com = {0.0, 0.0, 0.0, 0.0};
-    TestParticle com_node0 = {0.0, 0.0, 0.0, 0.0};
-    TestParticle com_node1 = {0.0, 0.0, 0.0, 0.0};
-    for (int i = 0; i < NUM_PARTICLES; i++) {
-        com.x += test_particles[i].x * test_particles[i].mass;
-        com.y += test_particles[i].y * test_particles[i].mass;
-        com.z += test_particles[i].z * test_particles[i].mass;
-        com.mass += test_particles[i].mass;
+    // Check that node 10 through 18 have same pos and that their pos match total center of mass
+    // Compute center of mass from particles
+    double com_x = 0.0, com_y = 0.0, com_z = 0.0, total_mass = 0.0;
+    double com_node0_x = 0.0, com_node0_y = 0.0, com_node0_z = 0.0, mass_node0 = 0.0;
+    double com_node1_x = 0.0, com_node1_y = 0.0, com_node1_z = 0.0, mass_node1 = 0.0;
+    
+    for (int i = 0; i < particles.size(); i++) {
+        double x = double(particles[i].pos[0]);
+        double y = double(particles[i].pos[1]);
+        double z = double(particles[i].pos[2]);
+        double mass = double(particles[i].mass);
+        
+        com_x += x * mass;
+        com_y += y * mass;
+        com_z += z * mass;
+        total_mass += mass;
 
-        if(i < 8) {
-            com_node0.x += test_particles[i].x * test_particles[i].mass;
-            com_node0.y += test_particles[i].y * test_particles[i].mass;
-            com_node0.z += test_particles[i].z * test_particles[i].mass;
-            com_node0.mass += test_particles[i].mass;
-        }
-        else {
-            com_node1.x += test_particles[i].x * test_particles[i].mass;
-            com_node1.y += test_particles[i].y * test_particles[i].mass;
-            com_node1.z += test_particles[i].z * test_particles[i].mass;
-            com_node1.mass += test_particles[i].mass;
-        }
     }
-    com.x /= com.mass;
-    com.y /= com.mass;
-    com.z /= com.mass;
-    com_node0.x /= com_node0.mass;
-    com_node0.y /= com_node0.mass;
-    com_node0.z /= com_node0.mass;
-    com_node1.x /= com_node1.mass;
-    com_node1.y /= com_node1.mass;
-    com_node1.z /= com_node1.mass;
+    
+    com_x /= total_mass;
+    com_y /= total_mass;
+    com_z /= total_mass;
 
-    // Check that node 2 through 10 have same pos and that their pos match total center of mass to within 0.1%
+    // Check that node 10 through 18 have same pos and that their pos match total center of mass to within tolerance
     const double COM_TOL = 1e-6;
     test_tmp = true;
-    for (int i = 10; i < 19; i++) {
-        nodeleaf node = convert_output_node(tree_output[i]);
-        test_tmp &= (abs(double(node.pos[0]) - com.x) < COM_TOL);
-        test_tmp &= (abs(double(node.pos[1]) - com.y) < COM_TOL);
-        test_tmp &= (abs(double(node.pos[2]) - com.z) < COM_TOL);
+    for (int i = 0; i < MAX_DEPTH-1; i++) {
+        nodeleaf node = tree[i];
+        test_tmp &= (std::abs(double(node.pos[0]) - com_x) < COM_TOL);
+        test_tmp &= (std::abs(double(node.pos[1]) - com_y) < COM_TOL);
+        test_tmp &= (std::abs(double(node.pos[2]) - com_z) < COM_TOL);
     }
 
     if(!test_tmp) {
-        std::cout << "ERROR: Node 10 through 18 have different positions!" << std::endl;
+        std::cout << "ERROR: Node 0 through " << MAX_DEPTH-1 << " have different positions!" << std::endl;
     }
     test_passed &= test_tmp;
 
@@ -313,33 +254,32 @@ int main() {
     std::cout << "MAX_DEPTH = " << MAX_DEPTH << std::endl;
     std::cout << "NLEAF = " << NLEAF << std::endl;
     std::cout << "sizeof(nodeleaf) = " << sizeof(nodeleaf) << " bytes" << std::endl;
-    
+
     bool test0, test1, test2, test3, test_passed;
+
     test0 = test_peano_hilbert_key();
     test1 = test_simple_manual_particles(false);
-    test2 = test_at_max_depth();
+    test2 = test_at_max_depth(false);
     test3 = test_random_particles(false);
     test_passed = test0 && test1 && test2 && test3;
 
-    if(!test1) {
-        test_simple_manual_particles(true);
-    }
 
-    if(!test3) {
-        test_random_particles(true);
-    }
+    std::cout << std::endl;
 
     if(!test0) {
         std::cout << "❌ Test peano hilbert key FAILED!" << std::endl;
     }
     if(!test1) {
         std::cout << "❌ Test simple manual particles FAILED!" << std::endl;
+        test_simple_manual_particles(true);
     }
     if(!test2) {
         std::cout << "❌ Test at max depth FAILED!" << std::endl;
+        test2 = test_at_max_depth(true);
     }
     if(!test3) {
         std::cout << "❌ Test random particles FAILED!" << std::endl;
+        test_random_particles(true);
     }
 
     
