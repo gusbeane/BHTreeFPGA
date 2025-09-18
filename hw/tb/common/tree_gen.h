@@ -76,6 +76,43 @@ std::vector<particle_t> phsort(std::vector<particle_t> particles, int max_depth,
   return particles;
 }
 
+TreeAndParticles generate_simple_tree(int max_depth, bool verbose) {
+  // Create a very simple test case with exactly 4 particles at known positions
+  const int NUM_PARTICLES = 4;
+
+  // Create particles array with predefined positions at different octants
+  std::vector<particle_t> particles(NUM_PARTICLES);
+  
+  // Create simple test case with particles in different octants
+  particles[0].pos[0] = pos_t(0.1f); particles[0].pos[1] = pos_t(0.1f); particles[0].pos[2] = pos_t(0.1f); // octant 0
+  particles[1].pos[0] = pos_t(0.9f); particles[1].pos[1] = pos_t(0.1f); particles[1].pos[2] = pos_t(0.1f); // octant 1
+  particles[2].pos[0] = pos_t(0.1f); particles[2].pos[1] = pos_t(0.9f); particles[2].pos[2] = pos_t(0.1f); // octant 2
+  particles[3].pos[0] = pos_t(0.9f); particles[3].pos[1] = pos_t(0.9f); particles[3].pos[2] = pos_t(0.9f); // octant 7
+  
+  // Set mass and index for all particles
+  for (int i = 0; i < NUM_PARTICLES; i++) {
+    particles[i].mass = mass_t(0.25f); // 1.0 / 4 particles
+    particles[i].idx = count_t(i);
+  }
+
+  if (verbose) {
+    std::cout << "Created 4 particles for simple tree test" << std::endl;
+  }
+
+  // Sort particles by PH key
+  particles = phsort(particles, max_depth, verbose);
+
+  // Print first and last ph key
+  if (verbose) {
+    std::cout << "First ph key: " << particles[0].key << std::endl;
+    std::cout << "Last ph key: " << particles[particles.size() - 1].key << std::endl;
+  }
+
+  std::vector<nodeleaf> tree = treecon_wrapper(particles, NUM_PARTICLES, verbose);
+
+  return {tree, particles};
+}
+
 TreeAndParticles generate_random_tree(int num_particles, int max_depth,
                                       bool verbose) {
   const int NUM_PARTICLES = 1000;

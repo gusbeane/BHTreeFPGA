@@ -16,119 +16,58 @@
 const int TREE_DEPTH = 2048;
 const int PARTICLE_DEPTH = 1024;
 
-// Test with manually created particles 
-bool test_simple_manual_particles() {
-    std::cout << "\n=== Test: Simple Manual Particles ===" << std::endl;
-    
-    // Create a very simple test case with known positions
-    const int NUM_PARTICLES = 4;
-    
-    // Manually create particles at different octants
-    std::vector<TestParticle> test_particles = {
-        {0.1, 0.1, 0.1, 0.25},  // octant 0
-        {0.9, 0.1, 0.1, 0.25},  // octant 1  
-        {0.1, 0.9, 0.1, 0.25},  // octant 2
-        {0.9, 0.9, 0.9, 0.25}   // octant 7
-    };
-    
-    // Compute PH keys and create sorted list
-    PeanoHilbert ph(10);
-    std::vector<std::pair<uint32_t, int>> key_index_pairs;
-    for (int i = 0; i < NUM_PARTICLES; i++) {
-      uint32_t ph_key = ph.generate_key(
-          test_particles[i].xint(), test_particles[i].yint(), test_particles[i].zint());
-      key_index_pairs.push_back({ph_key, i});
-    }
-    
-    // Sort by PH key
-    std::sort(key_index_pairs.begin(), key_index_pairs.end());
-    
-    std::cout << "Manual particles sorted by PH keys:" << std::endl;
-    for (int i = 0; i < NUM_PARTICLES; i++) {
-        int orig_idx = key_index_pairs[i].second;
-        uint32_t key = key_index_pairs[i].first;
-        std::cout << "  Particle " << i << " (orig " << orig_idx << "): pos=(" 
-                  << test_particles[orig_idx].x << "," 
-                  << test_particles[orig_idx].y << "," 
-                  << test_particles[orig_idx].z 
-                  << ") key=0x" << std::hex << key << std::dec << std::endl;
-    }
-    
-    // Convert to HLS format and run kernel
-    particle_t particles[PARTICLE_DEPTH];
-    for (int i = 0; i < NUM_PARTICLES; i++) {
-        int orig_idx = key_index_pairs[i].second;
-        uint32_t key = key_index_pairs[i].first;
-        particle_t p = create_test_particle(test_particles[orig_idx].x,
-                                           test_particles[orig_idx].y,
-                                           test_particles[orig_idx].z,
-                                           test_particles[orig_idx].mass,
-                                           key, i);
-        particles[i] = p;
-        print_particle(p, i);
-    }
-    
-    std::vector<ap_uint<512>> tree_output(TREE_DEPTH); // Small buffer for simple test
-    
-    std::cout << "\nRunning HLS kernel on manual particles..." << std::endl;
-    create_bhtree_kernel(particles, tree_output.data(), NUM_PARTICLES);
-    
-    // Analyze output
-    int num_nodes = 0;
-    std::cout << "\nOutput nodes:" << std::endl;
-    for (int i = 0; i < 50; i++) {
-        nodeleaf node = convert_output_node(tree_output[i]);
-        
-        // Stop if we encounter a node with zero mass and zero particles (likely uninitialized)
-        if (node.mass == 0.0 && node.num_particles == 0) {
-            break;
-        }
-        
-        num_nodes++;
-        print_node(node, i);
-        if (node.is_last) break;
-    }
-    
-    std::cout << "Simple test produced " << num_nodes << " nodes" << std::endl;
-    
-    // Basic sanity checks
-    bool test_passed = true;
-    
-    if (num_nodes == 0) {
-        std::cout << "ERROR: No output nodes generated!" << std::endl;
-        test_passed = false;
-    }
-    
-    // Check that masses are reasonable
-    double total_mass = 0.0;
-    for (int i = 0; i < num_nodes; i++) {
-        nodeleaf node = convert_output_node(tree_output[i]);
-        total_mass += double(node.mass);
-    }
-    
+// Test with manually created particles
+bool test_simple_manual_particles(bool verbose) {
+  std::cout << "\n=== Test: Simple Manual Particles ===" << std::endl;
+
+  auto result = generate_simple_tree(MAX_DEPTH, verbose);
+  std::vector<nodeleaf> tree = result.tree;
+  std::vector<particle_t> particles = result.particles;
+
+  std::cout << "Simple test produced " << tree.size() << " nodes" << std::endl;
+
+  // Basic sanity checks
+  bool test_passed = true;
+
+  if (tree.size() == 0) {
+    std::cout << "ERROR: No output nodes generated!" << std::endl;
+    test_passed = false;
+  }
+
+  // Check that masses are reasonable
+  double total_mass = 0.0;
+  for (int i = 0; i < tree.size(); i++) {
+    total_mass += double(tree[i].mass);
+  }
+
+  if (verbose) {
     std::cout << "Total mass in tree: " << total_mass << " (expected: 1.0)" << std::endl;
+  }
     if (std::abs(total_mass - 1.0) > 0.01) {
-      std::cout << "ERROR: Total mass mismatch!" << std::endl;
       test_passed = false;
     }
 
     // Now we loop over the nodes and check that their center of mass matches
     // the position of their respective particle
-    for (int i = 0; i < num_nodes; i++) {
-    int idx_map[] = {0, 2, 1, 3};
-    int part_idx = idx_map[i];
-      nodeleaf node = convert_output_node(tree_output[i]);
-      if (abs(double(node.pos[0]) - test_particles[part_idx].x) > 0.01 ||
-          abs(double(node.pos[1]) - test_particles[part_idx].y) > 0.01 ||
-          abs(double(node.pos[2]) - test_particles[part_idx].z) > 0.01) {
+    for (int i = 0; i < tree.size(); i++) {
+      int part_idx = tree.size() - i - 1;
+    nodeleaf node = tree[i];
+    if (abs(double(node.pos[0] - particles[part_idx].pos[0])) > 0.01 ||
+        abs(double(node.pos[1] - particles[part_idx].pos[1])) > 0.01 ||
+        abs(double(node.pos[2] - particles[part_idx].pos[2])) > 0.01) {
+      if (verbose) {
         std::cout << "ERROR: Node " << i
                   << " center of mass does not match particle position!"
                   << std::endl;
-        test_passed = false;
+        print_node(node, i);
       }
-      else {
-        std::cout << "Node " << i << " center of mass matches particle position!" << std::endl;
+      test_passed = false;
+    } else {
+      if (verbose) {
+        std::cout << "Node " << i
+                  << " center of mass matches particle position!" << std::endl;
       }
+    }
     }
 
     return test_passed;
@@ -377,10 +316,14 @@ int main() {
     
     bool test0, test1, test2, test3, test_passed;
     test0 = test_peano_hilbert_key();
-    test1 = test_simple_manual_particles();
+    test1 = test_simple_manual_particles(false);
     test2 = test_at_max_depth();
     test3 = test_random_particles(false);
     test_passed = test0 && test1 && test2 && test3;
+
+    if(!test1) {
+        test_simple_manual_particles(true);
+    }
 
     if(!test3) {
         test_random_particles(true);
