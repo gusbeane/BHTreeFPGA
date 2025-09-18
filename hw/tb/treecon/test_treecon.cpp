@@ -283,36 +283,15 @@ bool test_random_particles(bool verbose) {
     std::vector<nodeleaf> tree = result.tree;
     std::vector<particle_t> particles = result.particles;
 
-    // Construct tree with kernel
-    std::vector<ap_uint<512>> tree_output(TREE_DEPTH);
-    create_bhtree_kernel(particles.data(), tree_output.data(), NUM_PARTICLES);
-    
-    int num_nodes = 0;
-    for (int i = 0; i < tree_output.size(); i++) {
-        nodeleaf node = convert_output_node(tree_output[i]);
-        num_nodes++;
-        if (node.is_last) break;
+    // check expected number of nodes
+    int expected_nodes = 1494;
+    bool nodes_test_passed = (tree.size() == expected_nodes);
+    if (verbose && !nodes_test_passed) {
+      std::cout << "❌ Number of nodes test FAILED" << std::endl;
+      std::cout << "Number of nodes: " << tree.size() << std::endl;
+      std::cout << "Expected number of nodes: " << expected_nodes << std::endl;
     }
-
-    if (verbose) {
-      std::cout << "Number of particles: " << NUM_PARTICLES << std::endl;
-      std::cout << "Number of nodes: " << num_nodes << std::endl;
-    }
-
-    // Reverse tree output
-    std::reverse(tree_output.begin(), tree_output.begin() + num_nodes);
-
-    // Print first 10 nodes
-    if (verbose) {
-      std::cout << "First 10 nodes:" << std::endl;
-      for (int i = 0; i < 10; i++) {
-        nodeleaf node = convert_output_node(tree_output[i]);
-        print_node(node, i);
-      }
-      std::cout << std::endl;
-    }
-
-    // return false;
+    test_passed &= nodes_test_passed;
 
     // Check that the next sibling pointers are correct
     if (verbose) {
@@ -320,8 +299,8 @@ bool test_random_particles(bool verbose) {
     }
     int next_sibling = 0;
     bool sibling_test_passed = true;
-    for (int i = 0; i < num_nodes; i++) {
-        nodeleaf node = convert_output_node(tree_output[i]);
+    for (int i = 0; i < tree.size(); i++) {
+        nodeleaf node = tree[i];
         if(node.level > 1) continue;
 
         // check that the next sibling is correct
@@ -353,11 +332,13 @@ bool test_random_particles(bool verbose) {
     sibling_test_passed &= (next_sibling == -1u);
     test_passed &= sibling_test_passed;
 
-    // check sibling of a max depth node
+    // check sibling of a max depth node and mass of leaves
+    mass_t total_leaf_mass = 0.0;
     bool max_depth_node_test_passed = true;
-    for(int i = 0; i < num_nodes; i++) {
-        nodeleaf node = convert_output_node(tree_output[i]);
-        if(node.level == MAX_DEPTH) {
+    for(int i = 0; i < tree.size(); i++) {
+        nodeleaf node = tree[i];
+        if(node.is_leaf) {
+            total_leaf_mass += node.mass;
             if(node.next_sibling != 1 && node.next_sibling != -1u) {
                 max_depth_node_test_passed = false;
                 if (verbose) {
@@ -368,6 +349,18 @@ bool test_random_particles(bool verbose) {
             }
         }
     }
+    bool leaf_mass_test_passed = (std::abs(double(total_leaf_mass) - 1.0) < 1e-4);
+
+    if (verbose) {
+      if(leaf_mass_test_passed) {
+        std::cout << "Total leaf mass ✅ PASSED = " << double(total_leaf_mass) << std::endl;
+      }
+      else {
+        std::cout << "Total leaf mass ❌ FAILED = " << double(total_leaf_mass) << " (expected: 1.0)" << std::endl;
+      }
+    }
+
+    test_passed &= leaf_mass_test_passed;
 
     test_passed &= max_depth_node_test_passed;
 

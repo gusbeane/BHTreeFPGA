@@ -53,7 +53,6 @@ void particle_processor(const particle_t *particles,
 
   nodeleaf active_stack[MAX_DEPTH];
   nodeleaf result_stack[MAX_DEPTH];
-  int result_stack_num_nodes = 0;
 #pragma HLS ARRAY_PARTITION variable = active_stack complete dim = 1
 #pragma HLS ARRAY_PARTITION variable = result_stack complete dim = 1
 
@@ -61,7 +60,7 @@ INIT_STACK:
   for (int i = 0; i < MAX_DEPTH; i++) {
 #pragma HLS UNROLL
     nodeleaf new_node = generate_empty_node(p.key >> (3 * (MAX_DEPTH - (i + 1))), i + 1);
-    new_node.next_sibling = -1;
+    new_node.next_sibling = -1u;
     active_stack[i] = add_particle_to_node(new_node, p, true);
   }
 
@@ -71,7 +70,7 @@ PROCESS_PARTICLES:
 
     bool flush_mode = false;
     bool quiet_mode = false;
-    result_stack_num_nodes = 0;
+    int result_stack_num_nodes = 0;
 
     int level_divergence = 0;
   PROCESS_LEVELS:
@@ -92,10 +91,9 @@ PROCESS_PARTICLES:
         if (!quiet_mode) {
           result_stack[result_stack_num_nodes] = active_stack[level - 1];
           result_stack_num_nodes++;
-        }
-
-        if (active_stack[level - 1].num_particles <= NLEAF) {
-          quiet_mode = true;
+          if(active_stack[level - 1].num_particles <= NLEAF) {
+            quiet_mode = true;
+          }
         }
 
         nodeleaf new_node = generate_empty_node(node_key, level);
@@ -104,7 +102,7 @@ PROCESS_PARTICLES:
     }
 
     // Update next sibling tracker for nodes above the divergence level
-    for (int j=1; j<MAX_DEPTH; j++) {
+    for (int j=1; j<=MAX_DEPTH; j++) {
       #pragma HLS UNROLL
       if(active_stack[j-1].next_sibling != -1u && j < level_divergence) {
         active_stack[j-1].next_sibling = active_stack[j-1].next_sibling + result_stack_num_nodes;
@@ -125,7 +123,7 @@ PROCESS_PARTICLES:
   active_stack[0].is_last = true;
   
   bool quiet_mode = false;
-  result_stack_num_nodes = 0;
+  int result_stack_num_nodes = 0;
   for (int level = 1; level <= MAX_DEPTH; level++) {
 #pragma HLS UNROLL
     if (!quiet_mode) {

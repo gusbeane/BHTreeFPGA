@@ -17,14 +17,14 @@ bool test_peano_hilbert_key() {
     std::cout << "Key for position (100, 200, 300): 0x" << std::hex << key << std::dec << std::endl;
     
     // Multiple positions
-    std::vector<std::array<uint32_t, 3>> positions = {
+    std::vector<std::array<uint64_t, 3>> positions = {
         {0, 0, 0},
         {1000, 2000, 3000},
         {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},
         {
-            static_cast<uint32_t>(0.4 * static_cast<double>(UINT32_MAX)),
-            static_cast<uint32_t>(0.8 * static_cast<double>(UINT32_MAX)),
-            static_cast<uint32_t>(0.3 * static_cast<double>(UINT32_MAX))
+            static_cast<uint64_t>(0.4 * static_cast<double>(UINT32_MAX)),
+            static_cast<uint64_t>(0.8 * static_cast<double>(UINT32_MAX)),
+            static_cast<uint64_t>(0.3 * static_cast<double>(UINT32_MAX))
         },
         {1710436918, 3435321836, 4283210188}
     };

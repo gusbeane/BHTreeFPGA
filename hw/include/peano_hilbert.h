@@ -27,7 +27,7 @@ public:
     }
     
     // Generate Peano-Hilbert key for a single position
-    uint64_t generate_key(uint32_t x_in, uint32_t y_in, uint32_t z_in, int depth = -1) const {
+    uint64_t generate_key(uint64_t x_in, uint64_t y_in, uint64_t z_in, int depth = -1) const {
         if (depth == -1) {
             depth = max_depth;
         }
@@ -39,7 +39,7 @@ public:
         // Calculate shift to extract the 'depth' most significant bits
         int shift_amount = 32 - depth;
         
-        uint32_t x, y, z;
+        uint64_t x, y, z;
         if (shift_amount > 0) {
             x = x_in >> shift_amount;
             y = y_in >> shift_amount;
@@ -58,7 +58,7 @@ public:
         // Loop 'depth' times
         for (int i = 0; i < depth; i++) {
             // Mask for the i-th MSB (from left, 0-indexed)
-            uint32_t mask = 1U << (depth - 1 - i);
+            uint64_t mask = 1U << (depth - 1 - i);
             
             uint8_t pix = ((x & mask) ? 4 : 0) | 
                          ((y & mask) ? 2 : 0) | 
@@ -72,7 +72,7 @@ public:
     }
     
     // Generate keys for multiple positions
-    std::vector<uint64_t> generate_keys(const std::vector<std::array<uint32_t, 3>>& positions, 
+    std::vector<uint64_t> generate_keys(const std::vector<std::array<uint64_t, 3>>& positions, 
                                        int depth = -1) const {
         std::vector<uint64_t> keys;
         keys.reserve(positions.size());

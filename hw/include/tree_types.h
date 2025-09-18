@@ -6,7 +6,6 @@
 #include "ap_int.h"
 #include "ap_fixed.h"
 
-typedef ap_uint<32> posint_t[3];
 typedef ap_ufixed<32,0> pos_t;  // 32-bit fixed point, 0 fractional bits
 typedef double acc_t; // is double necessary?
 typedef ap_uint<30> phkey_t;
