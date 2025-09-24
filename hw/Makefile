@@ -6,7 +6,9 @@
 
 # Default kernel if none specified
 # You can override this by running: make csim KERNEL=my_other_kernel
-KERNEL ?= treecon
+ifndef KERNEL
+$(error KERNEL is not set. Please specify a kernel, e.g., 'make csim KERNEL=treecon')
+endif
 
 # Variables - these store values we'll reuse throughout the Makefile
 # $(shell ...) runs a shell command and captures its output
@@ -95,17 +97,6 @@ clean-all:
 list-kernels:
 	@echo "Available kernels:"
 	@ls $(HW_DIR)/config/ 2>/dev/null || echo "No config directories found"
-
-# Convenience targets for common kernels (add your kernel names here)
-# These let you run "make treecon-syn" instead of "make syn KERNEL=treecon"
-treecon-csim:
-	@$(MAKE) csim KERNEL=treecon
-
-treecon-syn:
-	@$(MAKE) syn KERNEL=treecon
-
-treecon-cosim:
-	@$(MAKE) cosim KERNEL=treecon
 
 # Add more convenience targets for other kernels as needed:
 # example_kernel-csim:
