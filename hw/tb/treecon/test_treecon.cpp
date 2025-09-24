@@ -12,9 +12,10 @@
 #include "test_peano_hilbert.h"
 #include "test_util.h"
 #include "tree_gen.h"
+#include "tree_io.h"
 
-const int TREE_DEPTH = 2048;
-const int PARTICLE_DEPTH = 1024;
+const int TREE_DEPTH = 16384;
+const int PARTICLE_DEPTH = 8192;
 
 // Test with manually created particles
 bool test_simple_manual_particles(bool verbose) {
@@ -246,6 +247,46 @@ bool test_random_particles(bool verbose) {
 
     std::cout << "Random particles test " << (test_passed ? "✅ PASSED" : "❌ FAILED") << std::endl;
 
+    // Print level 1 nodes
+    // if (verbose) {
+        std::cout << "Level 1 nodes:" << std::endl;
+        for (int i = 0; i < tree.size(); i++) {
+            nodeleaf node = tree[i];
+            if (node.level == 1) {
+                print_node(node, i);
+            }
+        }
+    // }
+
+    save_particles_and_tree(particles, tree, "random_test_data");
+
+    return test_passed;
+}
+
+bool test_quasirandom_particles(bool verbose) {
+    std::cout << "\n=== Test: Quasirandom Particles ===" << std::endl;
+    bool test_passed = true;
+    const int NUM_PARTICLES = 8000;
+    double pos0[3] = {0.5, 0.5, 0.5};
+    auto result = generate_quasirandom_tree(NUM_PARTICLES, MAX_DEPTH, verbose, pos0);
+    
+    std::vector<nodeleaf> tree = result.tree;
+    std::vector<particle_t> particles = result.particles;
+
+    save_particles_and_tree(particles, tree, "quasirandom_test_data");
+
+    // check expected number of nodes
+    int expected_nodes = 11487;
+    bool nodes_test_passed = (tree.size() == expected_nodes);
+    if (verbose && !nodes_test_passed) {
+      std::cout << "❌ Number of nodes test for quasirandom particles FAILED" << std::endl;
+      std::cout << "Number of nodes: " << tree.size() << std::endl;
+      std::cout << "Expected number of nodes: " << expected_nodes << std::endl;
+    }
+    test_passed &= nodes_test_passed;
+
+    std::cout << "Quasirandom particles test " << (test_passed ? "✅ PASSED" : "❌ FAILED") << std::endl;
+
     return test_passed;
 }
 
@@ -255,13 +296,14 @@ int main() {
     std::cout << "NLEAF = " << NLEAF << std::endl;
     std::cout << "sizeof(nodeleaf) = " << sizeof(nodeleaf) << " bytes" << std::endl;
 
-    bool test0, test1, test2, test3, test_passed;
+    bool test0, test1, test2, test3, test4, test_passed;
 
     test0 = test_peano_hilbert_key();
     test1 = test_simple_manual_particles(false);
     test2 = test_at_max_depth(false);
     test3 = test_random_particles(false);
-    test_passed = test0 && test1 && test2 && test3;
+    test4 = test_quasirandom_particles(false);
+    test_passed = test0 && test1 && test2 && test3 && test4;
 
 
     std::cout << std::endl;
@@ -282,14 +324,18 @@ int main() {
         test_random_particles(true);
     }
 
-    
+    if(!test4) {
+        std::cout << "❌ Test quasirandom particles FAILED!" << std::endl;
+        test_quasirandom_particles(true);
+    }
+
     // Summary
     std::cout << "\n=== Test Summary ===" << std::endl;
     if (test_passed) {
-        std::cout << "✅ Manual particle test PASSED!" << std::endl;
+        std::cout << "✅ Tree construction tests PASSED!" << std::endl << std::endl;
         return 0;
     } else {
-        std::cout << "❌ Manual particle test FAILED!" << std::endl;
+        std::cout << "❌ Tree construction tests FAILED!" << std::endl << std::endl;
         return 1;
     }
 }

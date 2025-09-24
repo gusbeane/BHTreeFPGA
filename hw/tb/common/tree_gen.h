@@ -165,11 +165,56 @@ TreeAndParticles generate_random_tree(int num_particles, int max_depth,
     particles[i].pos[1] = pos_dis(gen);
     particles[i].pos[2] = pos_dis(gen);
     particles[i].mass = 1.0f / NUM_PARTICLES;
-    particles[i].idx = i;
   }
 
   // sort particles by PH key
   particles = phsort(particles, max_depth, verbose);
+
+  // Set idx
+  for (int i = 0; i < NUM_PARTICLES; i++) {
+    particles[i].idx = i;
+  }
+
+  // print first and last ph key
+  std::cout << "First ph key: " << particles[0].key << std::endl;
+  std::cout << "Last ph key: " << particles[particles.size() - 1].key << std::endl;
+
+  std::vector<nodeleaf> tree = treecon_wrapper(particles, NUM_PARTICLES, verbose);
+
+  return {tree, particles};
+}
+
+TreeAndParticles generate_quasirandom_tree(int num_particles, int max_depth,
+  bool verbose, double pos0[3]) {
+const int NUM_PARTICLES = 8000;
+
+  double g = 1.22074408460575947536;
+  double a1 = 1.0/g;
+  double a2 = 1.0/(g*g);
+  double a3 = 1.0/(g*g*g);
+std::vector<particle_t> particles(NUM_PARTICLES);
+
+  double pos_dbl[3] = {pos0[0], pos0[1], pos0[2]};
+
+  for (int i = 0; i < NUM_PARTICLES; i++) {
+    particles[i].pos[0] = pos_t(pos_dbl[0]);
+    particles[i].pos[1] = pos_t(pos_dbl[1]);
+    particles[i].pos[2] = pos_t(pos_dbl[2]);
+
+    particles[i].mass = 1.0f / NUM_PARTICLES;
+
+    pos_dbl[0] = std::fmod(pos_dbl[0]+a1, 1.0);
+    pos_dbl[1] = std::fmod(pos_dbl[1]+a2, 1.0);
+    pos_dbl[2] = std::fmod(pos_dbl[2]+a3, 1.0);
+  }
+
+  // sort particles by PH key
+  particles = phsort(particles, max_depth, verbose);
+
+  // Set idx
+  for (int i = 0; i < NUM_PARTICLES; i++) {
+    particles[i].idx = i;
+  }
 
   // print first and last ph key
   std::cout << "First ph key: " << particles[0].key << std::endl;

@@ -16,7 +16,6 @@
 *.lock
 
 # Vitis specific files
-*.bin
 *.pdi
 *.vitisWorkspace.json
 
