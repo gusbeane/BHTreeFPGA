@@ -1,6 +1,7 @@
 #include "tree_config.h"
 #include "tree_types.h"
 #include <cstring>
+#include <algorithm>
 
 #ifndef __SYNTHESIS__
 #include <iostream>
@@ -18,6 +19,8 @@ nodeleaf add_particle_to_node(const nodeleaf &input_node,
   output_node.pos[2] += particle.pos[2] * particle.mass;
   output_node.mass += particle.mass;
   output_node.num_particles++;
+  output_node.hmax = std::fmax(output_node.hmax, particle.h);
+  output_node.hmin = std::fmin(output_node.hmin, particle.h);
 
   if (set_idx) {
     output_node.start_idx = particle.idx;
@@ -41,6 +44,8 @@ nodeleaf generate_empty_node(phkey_t node_key, level_t level) {
   node.is_leaf = true;
   node.is_last = false;
   node.next_sibling = 0;
+  node.hmax = 0.0;
+  node.hmin = std::numeric_limits<float>::max();
 
   return node;
 }

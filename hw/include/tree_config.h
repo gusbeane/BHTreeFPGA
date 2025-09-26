@@ -18,6 +18,7 @@ struct particle_t {
     count_t idx;
     phkey_t key;
     count_t next_tree_idx;
+    double h;
     bool valid;
 } __attribute__((aligned(64))); // padded to 64 bytes
 
@@ -39,8 +40,10 @@ struct nodeleaf {
     count_t target_cell; // 32 bits
     bool valid; // 1 bit
 
-    // total is 256 bits, no need to pad to 256 bits
-    // ap_uint<1> padding;
+    // min and max softenings
+    float hmin;
+    float hmax;
+
 } __attribute__((aligned(64))); // padded to 64 bytes
 
 #endif
