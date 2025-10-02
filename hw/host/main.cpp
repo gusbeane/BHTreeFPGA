@@ -17,8 +17,8 @@
 #include <CL/cl2.hpp>
 
 // HLS headers
-#include "../include/bhtree_config_hls.h"
-#include "../include/bhtree_types_hls.h"
+#include "../include/tree_config.h"
+#include "../include/tree_types.h"
 
 // Test particle structure
 struct TestParticle {
