@@ -154,6 +154,8 @@ TreeAndParticles generate_random_tree(int num_particles, int max_depth,
                                       bool verbose) {
   const int NUM_PARTICLES = 1000;
 
+  double h = 2.8 / pow(NUM_PARTICLES, 1.0/3.0);
+
   // Create random number generator with fixed seed for reproducibility
   std::mt19937 gen(42);
   std::uniform_real_distribution<float> pos_dis(0.0f, 1.0f);
@@ -165,6 +167,7 @@ TreeAndParticles generate_random_tree(int num_particles, int max_depth,
     particles[i].pos[1] = pos_dis(gen);
     particles[i].pos[2] = pos_dis(gen);
     particles[i].mass = 1.0f / NUM_PARTICLES;
+    particles[i].h = h;
   }
 
   // sort particles by PH key
@@ -188,6 +191,8 @@ TreeAndParticles generate_quasirandom_tree(int num_particles, int max_depth,
   bool verbose, double pos0[3]) {
 const int NUM_PARTICLES = 8000;
 
+  double h = 2.8 / pow(NUM_PARTICLES, 1.0/3.0);
+
   double g = 1.22074408460575947536;
   double a1 = 1.0/g;
   double a2 = 1.0/(g*g);
@@ -202,6 +207,7 @@ std::vector<particle_t> particles(NUM_PARTICLES);
     particles[i].pos[2] = pos_t(pos_dbl[2]);
 
     particles[i].mass = 1.0f / NUM_PARTICLES;
+    particles[i].h = h;
 
     pos_dbl[0] = std::fmod(pos_dbl[0]+a1, 1.0);
     pos_dbl[1] = std::fmod(pos_dbl[1]+a2, 1.0);
