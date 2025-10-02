@@ -49,7 +49,7 @@ bool eval_opening_criterion(double dx, double dy, double dz, double r2, double n
 void force_kernel(
     hls::stream<fk_work> &work_in,
     hls::stream<particle_t> &read_requests,
-    pos_t thetasq, pos_t eps_sq)
+    pos_t thetasq)
 {
     const pos_t node_sizes_sq[MAX_DEPTH] = {
         1.0 / (1 << 2),  1.0 / (1 << 4),  1.0 / (1 << 6),  1.0 / (1 << 8),
@@ -109,14 +109,15 @@ void force_kernel(
         } else {
             // Accept node - accumulate force
             double r2_double = (double)r2;
+            double r = hls::sqrt(r2_double);
             double rinv = hls::rsqrt(r2_double);
-            double rinv2soft = 1.0 / (r2_double + (double)eps_sq);
-            double rinv3 = rinv2soft * rinv;
-            double force = (double)(n.mass) * rinv3;
+
+            double W2 = softW2_gadget4(r, rinv, h);
+            double force = (double)(n.mass) * W2;
             
-            p.acc[0] += force * (double)dx;
-            p.acc[1] += force * (double)dy;
-            p.acc[2] += force * (double)dz;
+            p.acc[0] -= force * (double)dx * rinv;
+            p.acc[1] -= force * (double)dy * rinv;
+            p.acc[2] -= force * (double)dz * rinv;
             
             // Move to sibling
             if(n.next_sibling != -1u) {
@@ -277,7 +278,7 @@ void treewalk_simple(
 
     #ifndef __SYNTHESIS__
     std::thread work_distributor_thread(std::ref(work_distributor), std::ref(particle_in), std::ref(feedback), std::ref(fk_queue), std::ref(completed), tree[0], NUM_PARTICLES);
-    std::thread force_kernel_thread(std::ref(force_kernel), std::ref(fk_queue), std::ref(rk_queue), thetasq, eps_sq);
+    std::thread force_kernel_thread(std::ref(force_kernel), std::ref(fk_queue), std::ref(rk_queue), thetasq);
     std::thread read_kernel_thread(std::ref(read_kernel), std::ref(rk_queue), std::ref(feedback), tree);
     std::thread output_kernel_thread(std::ref(output_kernel), std::ref(completed), std::ref(particle_out), NUM_PARTICLES);
 
@@ -287,8 +288,8 @@ void treewalk_simple(
     output_kernel_thread.join();
     #else
     // Instantiate modules
-    work_distributor(particle_in, feedback, fk_queue, tree[0], NUM_PARTICLES);
-    force_kernel(fk_queue, rk_queue, thetasq, eps_sq);
+    work_distributor(particle_in, feedback, fk_queue, completed, tree[0], NUM_PARTICLES);
+    force_kernel(fk_queue, rk_queue, thetasq);
     read_kernel(rk_queue, feedback, tree);
     output_kernel(completed, particle_out, NUM_PARTICLES);
     #endif
