@@ -1,6 +1,7 @@
 #include "hls_math.h"
 #include "tree_config.h"
 #include "tree_types.h"
+#include "treewalk.h"
 
 #ifndef __SYNTHESIS__
 #include <thread>
@@ -11,7 +12,8 @@
     return m;                 // one mutex per process for stdout
   }
 
-#if defined(DEBUG) && (DEBUG)
+// #if defined(DEBUG)
+#if (0)
 #include <iostream>
 #define SIM_PRINT(msg)                            \
     do {                                                    \
@@ -26,6 +28,12 @@
   #define SIM_PRINT(msg) do { } while (0)
 #endif
 
+#define SIM_PRINT_ALWAYS(msg)                            \
+    do {                                                    \
+      std::lock_guard<std::mutex> lk(__stdout_mutex__());   \
+      msg;                        \
+    } while (0)
+
 // Simple work items
 struct fk_work {
     particle_t particle;
@@ -33,7 +41,6 @@ struct fk_work {
     ap_uint<1> kill_signal;
 };
 
-bool eval_opening_criterion(double dx, double dy, double dz, double r2, double node_size, double thetasq) {
 bool eval_opening_criterion(double dx, double dy, double dz, double r2, double node_size, double thetasq, double h) {
     #pragma HLS INLINE
 
@@ -184,8 +191,7 @@ void work_distributor(
 
     while(num_particles_finished < NUM_PARTICLES) {
         #pragma HLS PIPELINE II=1
-        
-        // SIM_PRINT(std::cout << "-" << std::flush);
+
 
         // Priority to feedback (continuing particles)
         fk_work work;
@@ -207,7 +213,8 @@ void work_distributor(
             // SIM_PRINT(std::cout << "n" << std::flush);
             particle_t p;
             if (new_particles.read_nb(p)) {
-                // Initialize particle
+                // Initialize particle for tree traversal
+                // Note: h, mass, pos, idx should be set by caller
                 p.next_tree_idx = 0;
                 p.acc[0] = 0;
                 p.acc[1] = 0;
@@ -245,6 +252,7 @@ void output_kernel(
         if (completed.read_nb(p)) {
             particle_out.write_nb(p);
             num_particles_written++;
+            SIM_PRINT(std::cout << "wrote particle " << p.idx << std::endl);
         }
     }
     SIM_PRINT(std::cout << "OUTPUT_KERNEL FINISHED" << std::endl);
@@ -283,7 +291,6 @@ void treewalk_simple(
     #pragma HLS STREAM variable=completed depth=8
     
     pos_t thetasq = theta * theta;
-    pos_t eps_sq = epsilon * epsilon;
 
     #ifndef __SYNTHESIS__
     std::thread work_distributor_thread(std::ref(work_distributor), std::ref(particle_in), std::ref(feedback), std::ref(fk_queue), std::ref(completed), tree[0], NUM_PARTICLES);
