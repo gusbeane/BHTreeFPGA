@@ -54,22 +54,34 @@ void treewalk_simple(hls::stream<particle_t> &particle_in,
 #define SOFTFAC50 (-256.0)
 #define SOFTFAC51 (-8.0)
 
-double softW2(double r, double rinv, double h) {
+// additional softening factors to get second derivative of W2
+// #define SOFTFAC60 (768.0 / 5)
+
+inline double softW2(double u) {
+  double u2 = u * u;
+  if (u < 0.5) {
+    return u * (static_cast<double>(SOFTFAC1) +
+                u2 * (static_cast<double>(SOFTFAC2) * u +
+                      static_cast<double>(SOFTFAC3)));
+  } else {
+    double u3 = u2 * u;
+    return u *
+           (static_cast<double>(SOFTFAC8) + static_cast<double>(SOFTFAC9) * u +
+            static_cast<double>(SOFTFAC10) * u2 +
+            static_cast<double>(SOFTFAC11) * u3 +
+            static_cast<double>(SOFTFAC12) / u3);
+  }
+}
+
+inline double softW2_gadget4(double r, double rinv, double h) {
+    // W2 function consistent with gfactor convention in gadget-4
     if(r > h) {
         return - rinv * rinv;
     }
     else{
-        double u = r / h;
-        double u2 = u * u;
-        double h_inv = 1.0 / h;
-        double h2_inv = h_inv * h_inv;
-        if(u < 0.5) {
-            return - h2_inv * u * (static_cast<double>(SOFTFAC1) + u2 * (static_cast<double>(SOFTFAC2)*u + static_cast<double>(SOFTFAC3)));
-        }
-        else{
-            double u3 = u2 * u;
-            return - h2_inv * u * (static_cast<double>(SOFTFAC8) + static_cast<double>(SOFTFAC9) * u + static_cast<double>(SOFTFAC10) * u2 + static_cast<double>(SOFTFAC11) * u3 + static_cast<double>(SOFTFAC12) / u3);
-        }
+        double hinv = 1.0 / h;
+        double u = r * hinv;
+        return - hinv * hinv * softW2(u);
     }
 }
 
