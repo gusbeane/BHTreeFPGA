@@ -34,7 +34,14 @@ struct fk_work {
 };
 
 bool eval_opening_criterion(double dx, double dy, double dz, double r2, double node_size, double thetasq) {
+bool eval_opening_criterion(double dx, double dy, double dz, double r2, double node_size, double thetasq, double h) {
     #pragma HLS INLINE
+
+    // if r is < 2h, we open to be safe
+    if(r2 < 4.0 * h * h) {
+        return true;
+    }
+
     return r2 * thetasq < node_size;
 }
 
@@ -93,7 +100,9 @@ void force_kernel(
         double r2 = dx * dx + dy * dy + dz * dz;
 
         SIM_PRINT(std::cout << "r2: " << r2 << " thetasq: " << thetasq << " node_sizes_sq[n.level-1]: " << node_sizes_sq[n.level-1] << std::endl);
-        bool do_i_open = eval_opening_criterion(dx, dy, dz, r2, node_sizes_sq[n.level-1], thetasq);
+        double h = double(fmax(n.hmax, p.h));
+
+        bool do_i_open = eval_opening_criterion(dx, dy, dz, r2, node_sizes_sq[n.level-1], thetasq, h);
         if (do_i_open && !n.is_leaf) {
             // Open node - go to first child
             p.next_tree_idx += 1;
