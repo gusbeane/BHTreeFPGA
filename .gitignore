@@ -26,5 +26,6 @@ compile_commands.json
 hw/.analyzer_session.json
 
 bhvenv/
+.venv/
 hw/emconfig.json
 sw/Makefile
