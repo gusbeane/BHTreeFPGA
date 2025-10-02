@@ -118,6 +118,13 @@ void force_kernel(
             p.acc[0] -= force * (double)dx * rinv;
             p.acc[1] -= force * (double)dy * rinv;
             p.acc[2] -= force * (double)dz * rinv;
+
+            if(n.is_leaf) {
+                p.Nint_leaf++;
+            }
+            else {
+                p.Nint_node++;
+            }
             
             // Move to sibling
             if(n.next_sibling != -1u) {
@@ -206,6 +213,8 @@ void work_distributor(
                 p.acc[1] = 0;
                 p.acc[2] = 0;
                 p.valid = true;
+                p.Nint_leaf = 0;
+                p.Nint_node = 0;
                 
                 fk_work init_work = {p, first_node, false};
                 SIM_PRINT(std::cout << "new particle writing to fk_queue..." << std::endl);

@@ -20,6 +20,8 @@ struct particle_t {
     count_t next_tree_idx;
     double h;
     bool valid;
+    int Nint_leaf;
+    int Nint_node;
 } __attribute__((aligned(64))); // padded to 64 bytes
 
 struct nodeleaf {
