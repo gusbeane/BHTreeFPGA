@@ -188,6 +188,7 @@ void work_distributor(
     SIM_PRINT(std::cout << "WORK_DISTRIBUTOR STARTED" << std::endl);
 
     long num_particles_finished = 0;
+    long num_particles_running = 0;
 
     while(num_particles_finished < NUM_PARTICLES) {
         #pragma HLS PIPELINE II=1
@@ -205,8 +206,11 @@ void work_distributor(
                 SIM_PRINT(std::cout << "particle done, outputting" << std::endl);
                 output_particles.write_nb(work.particle);
                 num_particles_finished++;
-                break;
+                num_particles_running--;
             }
+        }
+        else if(num_particles_running >= 1) {
+            continue;
         }
         // Then new particles
         else {
@@ -226,6 +230,7 @@ void work_distributor(
                 fk_work init_work = {p, first_node, false};
                 SIM_PRINT(std::cout << "new particle writing to fk_queue..." << std::endl);
                 fk_queue.write_nb(init_work);
+                num_particles_running++;
             }
         }
     }
